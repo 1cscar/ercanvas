@@ -774,11 +774,20 @@ document.getElementById('btn-new-diagram').addEventListener('click', async () =>
   btn.disabled = true;
   try {
     const newRef = doc(collection(db, 'users', currentUser.uid, 'diagrams'));
-    const data = { name:'未命名圖表', nodes:[], edges:[], nextId:1, updatedAt: serverTimestamp() };
-    // 不 await，先開啟編輯器，Firestore 背景寫入
-    setDoc(newRef, data).catch(e => console.error('新增圖表寫入失敗:', e));
+    const now = Date.now();
+    const newData = { name:'未命名圖表', nodes:[], edges:[], nextId:1, updatedAt: now };
+    // 立即寫入 localStorage
+    saveDiagCache(newRef.id, newData.name, [], [], 1, now);
+    try {
+      const list = loadListCache() || [];
+      list.unshift({ id: newRef.id, name: newData.name, updatedAt: now, nodeCount: 0 });
+      localStorage.setItem(listKey(), JSON.stringify(list));
+    } catch(e) {}
+    // 背景寫入 Firestore
+    setDoc(newRef, { ...newData, updatedAt: serverTimestamp() })
+      .catch(e => console.error('新增圖表寫入失敗:', e));
     currentDiagramId = newRef.id;
-    openDiagram(newRef.id, { ...data, updatedAt: null });
+    openDiagram(newRef.id, newData);
   } catch(e) {
     console.error('新增圖表失敗:', e);
     alert('新增失敗，請重試');
@@ -1757,7 +1766,23 @@ updateToolbarVisibility = function() { _origUpdateTb(); syncTbToSelection(); };
 // ── Back to Home ──────────────────────────────────────────────────────────────
 document.getElementById('btn-back-home').addEventListener('click', () => {
   clearTimeout(saveTimer);
+  // 先把目前編輯中的最新狀態存入 localStorage（立即）
+  if (currentDiagramId) {
+    const name = document.getElementById('diagram-name').value;
+    const now = Date.now();
+    saveDiagCache(currentDiagramId, name, S.nodes, S.edges, S.nextId, now);
+    try {
+      const list = loadListCache() || [];
+      const idx = list.findIndex(x => x.id === currentDiagramId);
+      const entry = { id: currentDiagramId, name, updatedAt: now, nodeCount: S.nodes.length };
+      if (idx >= 0) list[idx] = entry; else list.unshift(entry);
+      list.sort((a, b) => b.updatedAt - a.updatedAt);
+      localStorage.setItem(listKey(), JSON.stringify(list));
+    } catch(e) {}
+  }
+  // 從 localStorage 立即渲染 Home，背景同步 Firestore
   show('home');
+  loadHomeFast();
   loadHome();
 });
 </script>
