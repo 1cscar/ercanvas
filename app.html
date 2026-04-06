@@ -479,8 +479,34 @@ function show(name) {
   if (name === 'app' || name === 'home') el.style.flexDirection = 'column';
 }
 
-show('loading');
+// ── Local-first boot ─────────────────────────────────────────────────────────
+// Try to show Home immediately from localStorage before Firebase responds
+const _cachedSession = (() => {
+  try { return JSON.parse(localStorage.getItem('er_session') || 'null'); } catch(e) { return null; }
+})();
+
+if (_cachedSession) {
+  // Restore minimal user info and show home instantly
+  currentUser = _cachedSession;
+  applyUserUI(_cachedSession);
+  show('home');
+  loadHomeFast(); // render from localStorage only, no network
+} else {
+  show('loading');
+}
+
 boot();
+
+function applyUserUI(user) {
+  if (user.photoURL) {
+    ['user-avatar','home-avatar'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.src = user.photoURL; el.style.display = 'block'; }
+    });
+  }
+  const nameEl = document.getElementById('home-username');
+  if (nameEl) nameEl.textContent = user.displayName || user.email || '';
+}
 
 function boot() {
   try {
@@ -493,18 +519,19 @@ function boot() {
   onAuthStateChanged(auth, user => {
     if (user) {
       currentUser = user;
-      // Sync avatars
-      if (user.photoURL) {
-        ['user-avatar','home-avatar'].forEach(id => {
-          const el = document.getElementById(id);
-          el.src = user.photoURL; el.style.display = 'block';
-        });
-      }
-      const nameEl = document.getElementById('home-username');
-      if (nameEl) nameEl.textContent = user.displayName || user.email || '';
-      show('home');
+      // Persist session for next cold start
+      try { localStorage.setItem('er_session', JSON.stringify({
+        uid: user.uid, displayName: user.displayName,
+        email: user.email, photoURL: user.photoURL
+      })); } catch(e) {}
+      applyUserUI(user);
+      if (!_cachedSession) { show('home'); }
+      // Background sync from Firestore
       loadHome();
-    } else { show('login'); }
+    } else {
+      localStorage.removeItem('er_session');
+      show('login');
+    }
   });
 }
 
@@ -533,25 +560,52 @@ document.getElementById('btn-google-login').addEventListener('click', async () =
 document.getElementById('btn-logout').addEventListener('click', () => signOut(auth).then(() => show('login')));
 document.getElementById('home-logout').addEventListener('click', () => signOut(auth).then(() => show('login')));
 
-// ── Home cache helpers ────────────────────────────────────────────────────────
-function cacheKey() { return 'er_home_' + currentUser.uid; }
+// ── Local cache helpers ───────────────────────────────────────────────────────
+function listKey()   { return 'er_list_'    + currentUser.uid; }
+function diagKey(id) { return 'er_diag_'    + currentUser.uid + '_' + id; }
 
-function saveHomeCache(docs) {
+// Save full diagram to localStorage
+function saveDiagCache(id, name, nodes, edges, nextId, updatedAt) {
   try {
-    // Store lightweight version (no need for full nodes array in cache)
-    const lite = docs.map(({ id, data }) => ({
-      id,
-      name: data.name || '未命名圖表',
-      updatedAt: data.updatedAt?.toMillis?.() ?? 0,
-      nodeCount: (data.nodes||[]).length,
-    }));
-    localStorage.setItem(cacheKey(), JSON.stringify(lite));
+    localStorage.setItem(diagKey(id), JSON.stringify({ id, name, nodes, edges, nextId, updatedAt }));
   } catch(e) {}
 }
 
-function loadHomeCache() {
-  try { return JSON.parse(localStorage.getItem(cacheKey()) || 'null'); }
+// Save list metadata (lightweight)
+function saveListCache(docs) {
+  try {
+    const lite = docs.map(({ id, data }) => ({
+      id,
+      name: data.name || '未命名圖表',
+      updatedAt: data.updatedAt?.toMillis?.() ?? data.updatedAt ?? 0,
+      nodeCount: (data.nodes||[]).length,
+    }));
+    localStorage.setItem(listKey(), JSON.stringify(lite));
+  } catch(e) {}
+}
+
+function loadListCache() {
+  try { return JSON.parse(localStorage.getItem(listKey()) || 'null'); }
   catch(e) { return null; }
+}
+
+function loadDiagCache(id) {
+  try { return JSON.parse(localStorage.getItem(diagKey(id)) || 'null'); }
+  catch(e) { return null; }
+}
+
+// Render home instantly from localStorage only (no network)
+function loadHomeFast() {
+  const cached = loadListCache();
+  const grid = document.getElementById('home-grid');
+  const empty = document.getElementById('home-empty');
+  const loading = document.getElementById('home-loading');
+  if (!grid) return;
+  grid.innerHTML = '';
+  loading.classList.add('hidden');
+  if (!cached || !cached.length) { empty.style.display = 'flex'; return; }
+  empty.style.display = 'none';
+  cached.forEach(item => renderDiagramCardSkeleton(item));
 }
 
 // ── Home ──────────────────────────────────────────────────────────────────────
@@ -559,19 +613,12 @@ async function loadHome() {
   const grid = document.getElementById('home-grid');
   const empty = document.getElementById('home-empty');
   const loading = document.getElementById('home-loading');
-  grid.innerHTML = '';
-  empty.style.display = 'none';
+  if (!grid) return;
 
-  // 1. 立即顯示快取（若有）
-  const cached = loadHomeCache();
-  if (cached && cached.length) {
-    cached.forEach(item => renderDiagramCardSkeleton(item));
-    loading.classList.add('hidden');
-  } else {
-    loading.classList.remove('hidden');
-  }
+  // 立即顯示 localStorage 快取
+  loadHomeFast();
 
-  // 2. 背景從 Firestore 抓最新資料
+  // 背景從 Firestore 同步（有 IndexedDB 快取時幾乎也是瞬間）
   try {
     const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'diagrams'));
     const docs = [];
@@ -579,16 +626,16 @@ async function loadHome() {
       const d = s.data();
       if (!Array.isArray(d.nodes)) return;
       docs.push({ id: s.id, data: d });
+      // 同時把完整圖表資料存入 localStorage
+      saveDiagCache(s.id, d.name, d.nodes, d.edges, d.nextId, d.updatedAt?.toMillis?.() ?? 0);
     });
     docs.sort((a, b) => (b.data.updatedAt?.toMillis?.() ?? 0) - (a.data.updatedAt?.toMillis?.() ?? 0));
+    saveListCache(docs);
 
-    // 更新快取
-    saveHomeCache(docs);
-
-    // 重新渲染（清掉 skeleton）
     grid.innerHTML = '';
     loading.classList.add('hidden');
     if (!docs.length) { empty.style.display = 'flex'; return; }
+    empty.style.display = 'none';
     docs.forEach(({ id, data }) => renderDiagramCard(id, data));
   } catch(e) {
     loading.classList.add('hidden');
@@ -704,12 +751,15 @@ function buildPreviewSVG(nodes, edges) {
 
 async function openDiagram(id, data) {
   currentDiagramId = id;
-  S.nodes  = data.nodes  || [];
-  S.edges  = data.edges  || [];
-  S.nextId = data.nextId || 1;
+  // 優先用 localStorage 快取（0ms），若無才用傳入的 data
+  const cached = loadDiagCache(id);
+  const src = cached || data;
+  S.nodes  = src.nodes  || [];
+  S.edges  = src.edges  || [];
+  S.nextId = src.nextId || 1;
   S.selectedIds.clear(); S.selectedEdgeId = null;
   S.pan = { x:100, y:80 }; S.zoom = 1;
-  document.getElementById('diagram-name').value = data.name || '未命名圖表';
+  document.getElementById('diagram-name').value = src.name || '未命名圖表';
   if (currentUser.photoURL) {
     const av = document.getElementById('user-avatar');
     av.src = currentUser.photoURL; av.style.display = 'block';
@@ -739,14 +789,28 @@ document.getElementById('btn-new-diagram').addEventListener('click', async () =>
 
 // ── Save / Load ───────────────────────────────────────────────────────────────
 function scheduleSave() {
+  if (!currentDiagramId) return;
+  const name = document.getElementById('diagram-name').value;
   document.getElementById('save-status').textContent = '未儲存…';
+
+  // 1. 立即寫入 localStorage（0ms）
+  const now = Date.now();
+  saveDiagCache(currentDiagramId, name, S.nodes, S.edges, S.nextId, now);
+  // 更新 list 快取中的 metadata
+  try {
+    const list = loadListCache() || [];
+    const idx = list.findIndex(x => x.id === currentDiagramId);
+    const entry = { id: currentDiagramId, name, updatedAt: now, nodeCount: S.nodes.length };
+    if (idx >= 0) list[idx] = entry; else list.unshift(entry);
+    localStorage.setItem(listKey(), JSON.stringify(list));
+  } catch(e) {}
+
+  // 2. 背景同步 Firestore（debounce 2秒）
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
-    if (!currentDiagramId) return;
     try {
       await setDoc(doc(db, 'users', currentUser.uid, 'diagrams', currentDiagramId), {
-        name: document.getElementById('diagram-name').value,
-        nodes: S.nodes, edges: S.edges, nextId: S.nextId,
+        name, nodes: S.nodes, edges: S.edges, nextId: S.nextId,
         updatedAt: serverTimestamp(),
       });
       document.getElementById('save-status').textContent = '已儲存';
