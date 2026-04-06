@@ -636,13 +636,15 @@ function renderDiagramCard(id, data) {
   delBtn.className = 'absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-white/80 border border-gray-200 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 hover:border-red-300';
   delBtn.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 2l6 6M8 2L2 8" stroke="#dc2626" stroke-width="1.5" stroke-linecap="round"/></svg>';
   delBtn.title = '刪除圖表';
-  delBtn.addEventListener('click', async e => {
+  delBtn.addEventListener('click', e => {
     e.stopPropagation();
     if (!confirm(`確定刪除「${data.name || '未命名圖表'}」？`)) return;
-    await deleteDoc(doc(db, 'users', currentUser.uid, 'diagrams', id));
+    // 立即從畫面移除，背景同步 Firestore
     card.remove();
     if (!document.getElementById('home-grid').children.length)
       document.getElementById('home-empty').style.display='flex';
+    deleteDoc(doc(db, 'users', currentUser.uid, 'diagrams', id))
+      .catch(e => console.error('刪除失敗:', e));
   });
   thumb.appendChild(delBtn);
   card.appendChild(thumb);
