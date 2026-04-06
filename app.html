@@ -456,6 +456,8 @@ import { getFirestore, initializeFirestore, persistentLocalCache, persistentMult
          doc, setDoc, getDoc, getDocs, addDoc, deleteDoc, updateDoc, onSnapshot,
          collection, query, orderBy, serverTimestamp }
                                from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js';
+import { getDatabase, ref as rref, set as rset, onValue, off as roff, remove as rremove }
+                               from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js';
 
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBY0MWs5sjqaXBrJzYIQl7Bs_u161G_XHM",
@@ -468,12 +470,13 @@ const FIREBASE_CONFIG = {
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let app, auth, db, currentUser, saveTimer, currentDiagramId = null;
-let _currentOwnerUid = null;   // UID of diagram owner (differs from currentUser when viewing shared)
-let _diagListener    = null;   // onSnapshot unsubscribe for diagram content
-let _presListener    = null;   // onSnapshot unsubscribe for cursors
-let _lastOwnSaveTs   = 0;      // timestamp of our last Firestore write (to skip our own snapshots)
-let _viewerMode      = false;  // true when opened via share link with viewer permission
+let app, auth, db, rtdb, currentUser, saveTimer, currentDiagramId = null;
+let _currentOwnerUid = null;
+let _diagListener    = null;
+let _presListener    = null;
+let _lastOwnSaveTs   = 0;
+let _viewerMode      = false;
+let _rtdbSyncTimer   = null;   // throttle for RTDB live write
 
 const CURSOR_COLORS = ['#f43f5e','#f97316','#eab308','#22c55e','#06b6d4','#8b5cf6','#ec4899'];
 function _userColor(uid) {
@@ -586,6 +589,7 @@ function boot() {
     db   = initializeFirestore(app, {
       localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
     });
+    rtdb = getDatabase(app, 'https://remodel-d9545-default-rtdb.asia-southeast1.firebasedatabase.app');
   } catch(e) { show('setup'); return; }
   onAuthStateChanged(auth, user => {
     if (user) {
@@ -887,7 +891,18 @@ function scheduleSave() {
     } catch(e) {}
   }
 
-  // 2. 背景同步 Firestore（debounce 2秒，寫入擁有者的文件）
+  // 2. 立即廣播到 RTDB（150ms throttle，所有協作者立即看到）
+  if (rtdb && currentDiagramId && !_viewerMode) {
+    clearTimeout(_rtdbSyncTimer);
+    _rtdbSyncTimer = setTimeout(() => {
+      rset(rref(rtdb, `live/${currentDiagramId}`), {
+        nodes: S.nodes, edges: S.edges, nextId: S.nextId, name,
+        updatedBy: currentUser.uid, ts: Date.now(),
+      }).catch(()=>{});
+    }, 150);
+  }
+
+  // 3. 背景同步 Firestore（debounce 5秒，持久化）
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     try {
@@ -903,72 +918,54 @@ function scheduleSave() {
 }
 document.getElementById('diagram-name').addEventListener('input', scheduleSave);
 
-// ── Real-time collaboration ────────────────────────────────────────────────────
+// ── Real-time collaboration (RTDB) ────────────────────────────────────────────
 function stopAllListeners() {
-  if (_diagListener)  { _diagListener();  _diagListener  = null; }
-  if (_presListener)  { _presListener();  _presListener  = null; }
-  // Remove own cursor from Firestore
-  if (currentDiagramId && currentUser) {
-    deleteDoc(doc(db, 'cursors', currentDiagramId, 'users', currentUser.uid)).catch(()=>{});
-  }
+  if (_diagListener) { _diagListener(); _diagListener = null; }
+  if (_presListener) { _presListener(); _presListener = null; }
+  if (currentDiagramId && currentUser && rtdb)
+    rremove(rref(rtdb, `cursors/${currentDiagramId}/${currentUser.uid}`)).catch(()=>{});
   document.getElementById('cursor-layer').innerHTML = '';
 }
 
 function startDiagListener(diagId, ownerUid) {
-  _diagListener = onSnapshot(
-    doc(db, 'users', ownerUid, 'diagrams', diagId),
-    snap => {
-      if (!snap.exists()) return;
-      const d = snap.data();
-      const remoteTs = d.updatedAt?.toMillis?.() ?? 0;
-      // Skip if this is our own recent save (within 5s buffer)
-      if (Date.now() - _lastOwnSaveTs < 5000) return;
-      // Skip if data is older than what we have
-      if (remoteTs <= (_lastRemoteTs || 0)) return;
-      _lastRemoteTs = remoteTs;
-      // Apply remote state (preserve pan/zoom)
-      S.nodes  = d.nodes  || [];
-      S.edges  = d.edges  || [];
-      S.nextId = d.nextId || 1;
-      S.selectedIds.clear(); S.selectedEdgeId = null;
-      renderAll();
-      if (d.name) document.getElementById('diagram-name').value = d.name;
-      document.getElementById('save-status').textContent = '已同步 ✓';
-      setTimeout(() => {
-        if (document.getElementById('save-status').textContent === '已同步 ✓')
-          document.getElementById('save-status').textContent = '';
-      }, 2000);
-    },
-    err => console.warn('diag listener:', err)
-  );
+  if (_diagListener) { _diagListener(); _diagListener = null; }
+  const r = rref(rtdb, `live/${diagId}`);
+  const unsub = onValue(r, snap => {
+    if (!snap.exists()) return;
+    const d = snap.val();
+    if (!d || d.updatedBy === currentUser.uid) return; // skip own writes
+    S.nodes  = d.nodes  || [];
+    S.edges  = d.edges  || [];
+    S.nextId = d.nextId || S.nextId;
+    S.selectedIds.clear(); S.selectedEdgeId = null;
+    renderAll();
+    if (d.name) document.getElementById('diagram-name').value = d.name;
+    document.getElementById('save-status').textContent = '已同步 ✓';
+    setTimeout(() => {
+      if (document.getElementById('save-status').textContent === '已同步 ✓')
+        document.getElementById('save-status').textContent = '';
+    }, 1500);
+  }, err => console.warn('diag listener:', err));
+  _diagListener = unsub;
 }
-let _lastRemoteTs = 0;
 
 function startPresence(diagId) {
-  if (!currentUser) return;
-  const myColor = _userColor(currentUser.uid);
-  const myName  = currentUser.displayName || currentUser.email?.split('@')[0] || '使用者';
-
-  // Listen to all cursors in this diagram
-  _presListener = onSnapshot(
-    collection(db, 'cursors', diagId, 'users'),
-    snap => {
-      snap.docChanges().forEach(change => {
-        const uid = change.doc.id;
-        if (uid === currentUser.uid) return; // skip self
-        if (change.type === 'removed') {
-          document.querySelector(`#cursor-layer [data-uid="${uid}"]`)?.remove();
-          return;
-        }
-        const cur = change.doc.data();
-        // Stale check: remove cursors idle > 30s
-        const age = Date.now() - (cur.ts?.toMillis?.() ?? 0);
-        if (age > 30000) { document.querySelector(`#cursor-layer [data-uid="${uid}"]`)?.remove(); return; }
-        renderRemoteCursor(uid, cur.x, cur.y, cur.name, cur.color);
-      });
-    },
-    err => console.warn('presence listener:', err)
-  );
+  if (!currentUser || !rtdb) return;
+  if (_presListener) { _presListener(); _presListener = null; }
+  const r = rref(rtdb, `cursors/${diagId}`);
+  const unsub = onValue(r, snap => {
+    const all = snap.exists() ? snap.val() : {};
+    // Remove cursors no longer in snapshot
+    document.querySelectorAll('#cursor-layer [data-uid]').forEach(el => {
+      if (!all[el.dataset.uid]) el.remove();
+    });
+    Object.entries(all).forEach(([uid, cur]) => {
+      if (uid === currentUser.uid) return;
+      if (Date.now() - cur.ts > 30000) { document.querySelector(`#cursor-layer [data-uid="${uid}"]`)?.remove(); return; }
+      renderRemoteCursor(uid, cur.x, cur.y, cur.name, cur.color);
+    });
+  }, err => console.warn('presence listener:', err));
+  _presListener = unsub;
 }
 
 function renderRemoteCursor(uid, x, y, name, color) {
@@ -1005,21 +1002,20 @@ function renderRemoteCursor(uid, x, y, name, color) {
   g.setAttribute('transform', `translate(${x},${y})`);
 }
 
-// Mouse move → broadcast cursor (throttled 80ms)
+// Mouse move → broadcast cursor via RTDB (throttled 50ms)
 let _cursorTimer = null;
 $svg.addEventListener('mousemove', e => {
-  if (!currentDiagramId || !currentUser || _viewerMode) return;
+  if (!currentDiagramId || !currentUser || _viewerMode || !rtdb) return;
   clearTimeout(_cursorTimer);
   _cursorTimer = setTimeout(() => {
     const pt = toSVG(e.clientX, e.clientY);
-    const myName  = currentUser.displayName || currentUser.email?.split('@')[0] || '使用者';
-    const myColor = _userColor(currentUser.uid);
-    setDoc(doc(db, 'cursors', currentDiagramId, 'users', currentUser.uid), {
+    rset(rref(rtdb, `cursors/${currentDiagramId}/${currentUser.uid}`), {
       x: Math.round(pt.x), y: Math.round(pt.y),
-      name: myName, color: myColor,
-      ts: serverTimestamp(),
+      name: currentUser.displayName || currentUser.email?.split('@')[0] || '使用者',
+      color: _userColor(currentUser.uid),
+      ts: Date.now(),
     }).catch(()=>{});
-  }, 80);
+  }, 50);
 });
 
 // ── Geometry ──────────────────────────────────────────────────────────────────
@@ -2289,10 +2285,10 @@ const _origUpdateTb = updateToolbarVisibility;
 updateToolbarVisibility = function() { _origUpdateTb(); syncTbToSelection(); };
 
 // ── Back to Home ──────────────────────────────────────────────────────────────
-// Clean up cursors when leaving page
+// Clean up cursor when leaving page
 window.addEventListener('beforeunload', () => {
-  if (currentDiagramId && currentUser)
-    deleteDoc(doc(db, 'cursors', currentDiagramId, 'users', currentUser.uid)).catch(()=>{});
+  if (currentDiagramId && currentUser && rtdb)
+    rremove(rref(rtdb, `cursors/${currentDiagramId}/${currentUser.uid}`)).catch(()=>{});
 });
 
 document.getElementById('btn-back-home').addEventListener('click', () => {
