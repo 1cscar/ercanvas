@@ -392,7 +392,8 @@
 import { initializeApp }       from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js';
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut }
                                from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
-import { getFirestore, doc, setDoc, getDoc, getDocs, addDoc, deleteDoc,
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+         doc, setDoc, getDoc, getDocs, addDoc, deleteDoc,
          collection, query, orderBy, serverTimestamp }
                                from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js';
 
@@ -485,7 +486,9 @@ function boot() {
   try {
     app  = initializeApp(FIREBASE_CONFIG);
     auth = getAuth(app);
-    db   = getFirestore(app);
+    db   = initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    });
   } catch(e) { show('setup'); return; }
   onAuthStateChanged(auth, user => {
     if (user) {
