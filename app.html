@@ -518,10 +518,12 @@
 
       <!-- Table toolbar -->
       <div id="lm-table-toolbar" style="display:none; position:absolute; z-index:150;">
-        <div style="display:flex;gap:4px;background:white;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.1);padding:5px;">
-          <button id="lm-tb-add-col"    style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#F0FDF4;color:#16A34A;">＋ 欄位</button>
-          <button id="lm-tb-fk-connect" style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#EFF6FF;color:#2563EB;">FK 連線</button>
-          <button id="lm-tb-del-table"  style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#FEF2F2;color:#DC2626;">刪除</button>
+        <div style="display:flex;flex-direction:column;gap:3px;background:white;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.1);padding:5px;min-width:96px;">
+          <button id="lm-tb-add-col"    style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#F0FDF4;color:#16A34A;text-align:left;">＋ 新增欄位</button>
+          <button id="lm-tb-fk-connect" style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#F5F3FF;color:#7C3AED;text-align:left;">FK 連線</button>
+          <hr style="border:none;border-top:1px solid #f1f5f9;margin:1px 0;"/>
+          <button id="lm-tb-rename"     style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:1.5px solid #e5e7eb;cursor:pointer;background:white;color:#374151;text-align:left;">改名</button>
+          <button id="lm-tb-del-table"  style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#FEF2F2;color:#DC2626;text-align:left;">刪除</button>
         </div>
       </div>
 
@@ -2731,10 +2733,10 @@ function lmRefreshTable(tblId) {
 // ── Toolbar helpers ───────────────────────────────────────────────────────────
 function lmShowTbar(tblId) {
   const tbl=SL.tables.find(t=>t.id===tblId); if(!tbl) return;
-  const sc=lmToScreen(tbl.x+lmTblW(tbl)/2,tbl.y);
+  const sc=lmToScreen(tbl.x+lmTblW(tbl), tbl.y+LM_COL_H/2);
   const wr=$lmWrap.getBoundingClientRect();
-  $lmTbar.style.left=(sc.x-wr.left-80)+'px';
-  $lmTbar.style.top=(sc.y-wr.top-50)+'px';
+  $lmTbar.style.left=(sc.x-wr.left+10)+'px';
+  $lmTbar.style.top=(sc.y-wr.top-20)+'px';
   $lmTbar.style.display='block';
 }
 function lmShowCbar(tblId, colId) {
@@ -2915,9 +2917,13 @@ document.getElementById('lm-tb-add-col').addEventListener('click', e=>{
   e.stopPropagation();
   if(!SL.selectedTableId) return;
   const tbl=SL.tables.find(t=>t.id===SL.selectedTableId); if(!tbl) return;
-  const name=prompt('欄位名稱：'); if(!name) return;
-  tbl.columns.push({id:'lc'+(SL.nextId++), name:name.trim(), pk:false, fk:false});
-  lmRefreshTable(tbl.id); lmShowTbar(tbl.id);
+  const newCol={id:'lc'+(SL.nextId++), name:'欄位', pk:false, fk:false};
+  tbl.columns.push(newCol);
+  lmRefreshTable(tbl.id);
+  // Auto-open rename for the new column
+  SL.selectedColId={tableId:tbl.id, colId:newCol.id};
+  lmHideTbar(); lmShowCbar(tbl.id, newCol.id);
+  lmOpenColEdit(tbl.id, newCol.id);
   lmSnapshot(); lmScheduleSave();
 });
 document.getElementById('lm-tb-fk-connect').addEventListener('click', e=>{
@@ -2936,6 +2942,12 @@ document.getElementById('lm-tb-del-table').addEventListener('click', e=>{
   SL.selectedTableId=null; SL.selectedColId=null;
   lmHideTbar(); lmHideCbar();
   lmSnapshot(); lmScheduleSave();
+});
+
+document.getElementById('lm-tb-rename').addEventListener('click', e=>{
+  e.stopPropagation();
+  if(!SL.selectedTableId) return;
+  lmOpenNameEdit(SL.selectedTableId);
 });
 
 // ── Column toolbar actions ────────────────────────────────────────────────────
