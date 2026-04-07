@@ -778,6 +778,11 @@
           <hr style="border:none;border-top:1px solid #f1f5f9;margin:1px 0;"/>
           <button id="pm-col-rename" style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:1.5px solid #e5e7eb;cursor:pointer;background:white;color:#374151;text-align:left;">改名</button>
           <button id="pm-col-del"    style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#FEF2F2;color:#DC2626;text-align:left;">刪除</button>
+          <hr style="border:none;border-top:1px solid #f1f5f9;margin:1px 0;"/>
+          <div style="padding:2px 4px 3px;">
+            <div style="font-size:9px;color:#6b7280;font-weight:700;letter-spacing:.4px;margin-bottom:3px;">說明</div>
+            <input id="pm-col-note" type="text" placeholder="主鍵、外鍵、建立索引…" style="width:100%;box-sizing:border-box;font-size:11px;border:1px solid #d1d5db;border-radius:6px;padding:3px 6px;outline:none;font-family:sans-serif;"/>
+          </div>
         </div>
       </div>
 
@@ -3654,7 +3659,12 @@ const pmTEls  = new Map();
 const pmFkEls = new Map();
 
 // ── Geometry ──────────────────────────────────────────────────────────────────
-const PM_ROW_H=26, PM_HDR_H=28, PM_COL_W=180;
+const PM_ROW_H=26, PM_HDR_H=28, PM_SUBHDR_H=18, PM_COL_W=360, PM_NAME_W=148, PM_TYPE_W=84, PM_NOTE_W=128;
+function pmTrunc(text, maxPx, fsize, mono=false) {
+  const cw = mono ? fsize*0.62 : fsize*0.58;
+  const max = Math.floor(maxPx/cw);
+  return text.length<=max ? text : text.slice(0,max-1)+'…';
+}
 function pmToSVG(cx,cy) { const r=$pmSvg.getBoundingClientRect(); return {x:(cx-r.left-SP.pan.x)/SP.zoom,y:(cy-r.top-SP.pan.y)/SP.zoom}; }
 function pmToScreen(sx,sy) { const r=$pmSvg.getBoundingClientRect(); return {x:sx*SP.zoom+SP.pan.x+r.left,y:sy*SP.zoom+SP.pan.y+r.top}; }
 
@@ -3680,49 +3690,63 @@ function pmRenderTable(tbl) {
   g.classList.add('pm-table'); g.dataset.id=tbl.id;
   g.setAttribute('transform',`translate(${tbl.x},${tbl.y})`);
   const isSel=SP.selectedTableId===tbl.id;
-  const totalH=PM_HDR_H+tbl.columns.length*PM_ROW_H;
-  // Shadow rect
-  const shadow=mk('rect',{x:2,y:2,width:PM_COL_W,height:totalH,rx:4,fill:'rgba(0,0,0,0.06)'});
-  g.appendChild(shadow);
+  const totalH=PM_HDR_H+PM_SUBHDR_H+tbl.columns.length*PM_ROW_H;
+  const sc=isSel?'#2563EB':'#374151', sw=isSel?2:1.5;
+  // Shadow
+  g.appendChild(mk('rect',{x:2,y:2,width:PM_COL_W,height:totalH,rx:4,fill:'rgba(0,0,0,0.06)'}));
   // Outer border
-  const border=mk('rect',{x:0,y:0,width:PM_COL_W,height:totalH,rx:4,fill:'white',stroke:isSel?'#2563EB':'#374151','stroke-width':isSel?2:1.5});
-  g.appendChild(border);
-  // Header background
-  const hdr=mk('rect',{x:0,y:0,width:PM_COL_W,height:PM_HDR_H,rx:4,fill:isSel?'#EFF6FF':'#F9FAFB',stroke:isSel?'#2563EB':'#374151','stroke-width':isSel?2:1.5});
-  g.appendChild(hdr);
-  const hdrBottom=mk('line',{x1:0,y1:PM_HDR_H,x2:PM_COL_W,y2:PM_HDR_H,stroke:isSel?'#2563EB':'#374151','stroke-width':1.5});
-  g.appendChild(hdrBottom);
+  g.appendChild(mk('rect',{x:0,y:0,width:PM_COL_W,height:totalH,rx:4,fill:'white',stroke:sc,'stroke-width':sw}));
+  // Header bg
+  g.appendChild(mk('rect',{x:0,y:0,width:PM_COL_W,height:PM_HDR_H,rx:4,fill:isSel?'#EFF6FF':'#F9FAFB',stroke:sc,'stroke-width':sw}));
+  g.appendChild(mk('line',{x1:0,y1:PM_HDR_H,x2:PM_COL_W,y2:PM_HDR_H,stroke:sc,'stroke-width':sw}));
   // Table name
   const nameT=mk('text',{x:PM_COL_W/2,y:PM_HDR_H/2+1,'text-anchor':'middle','dominant-baseline':'middle','font-size':12,'font-weight':'700','font-family':'sans-serif',fill:isSel?'#1D4ED8':'#111827'});
   nameT.textContent=tbl.name; g.appendChild(nameT);
-  // Drag zone on header
+  // Drag zone
   const dragZ=mk('rect',{x:0,y:0,width:PM_COL_W,height:PM_HDR_H,fill:'transparent'});
   dragZ.style.cursor='move'; dragZ.dataset.tableId=tbl.id; dragZ.dataset.pmDragZone='1';
   g.appendChild(dragZ);
-  // Columns
+
+  // Sub-header row
+  const shY=PM_HDR_H;
+  g.appendChild(mk('rect',{x:0,y:shY,width:PM_COL_W,height:PM_SUBHDR_H,fill:'#F1F5F9'}));
+  g.appendChild(mk('line',{x1:0,y1:shY+PM_SUBHDR_H,x2:PM_COL_W,y2:shY+PM_SUBHDR_H,stroke:'#CBD5E1','stroke-width':1}));
+  // Vertical section dividers (spanning sub-header + data rows)
+  const divTop=PM_HDR_H, divBot=totalH;
+  g.appendChild(mk('line',{x1:PM_NAME_W,y1:divTop,x2:PM_NAME_W,y2:divBot,stroke:'#e2e8f0','stroke-width':1}));
+  g.appendChild(mk('line',{x1:PM_NAME_W+PM_TYPE_W,y1:divTop,x2:PM_NAME_W+PM_TYPE_W,y2:divBot,stroke:'#e2e8f0','stroke-width':1}));
+  // Sub-header labels
+  const shMidY=shY+PM_SUBHDR_H/2+1;
+  const lh=mk('text',{x:6,y:shMidY,'dominant-baseline':'middle','font-size':9,'font-weight':'700','font-family':'sans-serif',fill:'#64748B'});lh.textContent='欄位名稱';g.appendChild(lh);
+  const lt=mk('text',{x:PM_NAME_W+4,y:shMidY,'dominant-baseline':'middle','font-size':9,'font-weight':'700','font-family':'sans-serif',fill:'#64748B'});lt.textContent='型別';g.appendChild(lt);
+  const ln=mk('text',{x:PM_NAME_W+PM_TYPE_W+4,y:shMidY,'dominant-baseline':'middle','font-size':9,'font-weight':'700','font-family':'sans-serif',fill:'#64748B'});ln.textContent='說明';g.appendChild(ln);
+
+  // Data rows
   tbl.columns.forEach((col,i)=>{
-    const y=PM_HDR_H+i*PM_ROW_H;
+    const y=PM_HDR_H+PM_SUBHDR_H+i*PM_ROW_H;
     const isSelCol=SP.selectedColId?.tableId===tbl.id&&SP.selectedColId?.colId===col.id;
     const isFkSrc=SP.fkConnecting?.tableId===tbl.id&&SP.fkConnecting?.colId===col.id;
-    if(isSelCol||isFkSrc){
-      const bg=mk('rect',{x:0,y,width:PM_COL_W,height:PM_ROW_H,fill:isFkSrc?'#FEF9C3':'#EFF6FF'});
-      g.appendChild(bg);
-    }
-    // Row divider
-    if(i>0){const d=mk('line',{x1:0,y1:y,x2:PM_COL_W,y2:y,stroke:'#e5e7eb','stroke-width':1});g.appendChild(d);}
-    // Key indicators
-    const keyX=8;
-    if(col.pk){const kt=mk('text',{x:keyX,y:y+PM_ROW_H/2+1,'dominant-baseline':'middle','font-size':9,'font-weight':'700',fill:'#C2410C','font-family':'sans-serif'});kt.textContent='PK';g.appendChild(kt);}
-    else if(col.fk){const kt=mk('text',{x:keyX,y:y+PM_ROW_H/2+1,'dominant-baseline':'middle','font-size':9,'font-weight':'700',fill:'#2563EB','font-family':'sans-serif'});kt.textContent='FK';g.appendChild(kt);}
+    if(isSelCol||isFkSrc){g.appendChild(mk('rect',{x:0,y,width:PM_COL_W,height:PM_ROW_H,fill:isFkSrc?'#FEF9C3':'#EFF6FF'}));}
+    if(i>0){g.appendChild(mk('line',{x1:0,y1:y,x2:PM_COL_W,y2:y,stroke:'#f1f5f9','stroke-width':1}));}
+    // PK/FK badge
+    const midY=y+PM_ROW_H/2+1;
+    if(col.pk){const kt=mk('text',{x:4,y:midY,'dominant-baseline':'middle','font-size':8,'font-weight':'700',fill:'#C2410C','font-family':'sans-serif'});kt.textContent='PK';g.appendChild(kt);}
+    else if(col.fk){const kt=mk('text',{x:4,y:midY,'dominant-baseline':'middle','font-size':8,'font-weight':'700',fill:'#2563EB','font-family':'sans-serif'});kt.textContent='FK';g.appendChild(kt);}
     // Column name
-    const nameX=col.pk||col.fk?26:8;
-    const ct=mk('text',{x:nameX,y:y+PM_ROW_H/2+1,'dominant-baseline':'middle','font-size':11,'font-family':'sans-serif',fill:'#374151'});
+    const nameX=col.pk||col.fk?20:6;
+    const maxNamePx=PM_NAME_W-nameX-4;
+    const ct=mk('text',{x:nameX,y:midY,'dominant-baseline':'middle','font-size':11,'font-family':'sans-serif',fill:'#374151'});
     if(col.pk)ct.setAttribute('font-weight','600');
     if(col.nn)ct.setAttribute('text-decoration','underline');
-    ct.textContent=col.name; g.appendChild(ct);
-    // Data type (right-aligned)
-    const dt=mk('text',{x:PM_COL_W-6,y:y+PM_ROW_H/2+1,'text-anchor':'end','dominant-baseline':'middle','font-size':9,'font-family':'monospace',fill:'#9CA3AF'});
-    dt.textContent=col.type||'VARCHAR'; g.appendChild(dt);
+    ct.textContent=pmTrunc(col.name,maxNamePx,11); g.appendChild(ct);
+    // Data type
+    const dt=mk('text',{x:PM_NAME_W+4,y:midY,'dominant-baseline':'middle','font-size':10,'font-family':'monospace',fill:'#475569'});
+    dt.textContent=pmTrunc(col.type||'VARCHAR',PM_TYPE_W-8,10,true); g.appendChild(dt);
+    // Note / 說明
+    if(col.note){
+      const nt=mk('text',{x:PM_NAME_W+PM_TYPE_W+4,y:midY,'dominant-baseline':'middle','font-size':9,'font-family':'sans-serif',fill:'#64748B'});
+      nt.textContent=pmTrunc(col.note,PM_NOTE_W-8,9); g.appendChild(nt);
+    }
     // Hit area
     const hit=mk('rect',{x:0,y,width:PM_COL_W,height:PM_ROW_H,fill:'transparent'});
     hit.style.cursor='pointer'; hit.dataset.colId=col.id; hit.dataset.tableId=tbl.id;
@@ -3736,8 +3760,8 @@ function pmRenderFk(fk) {
   if(!ft||!tt) return;
   const fci=ft.columns.findIndex(c=>c.id===fk.fromCol),tci=tt.columns.findIndex(c=>c.id===fk.toCol);
   if(fci<0||tci<0) return;
-  const fx=ft.x+PM_COL_W/2, fy=ft.y+PM_HDR_H+fci*PM_ROW_H+PM_ROW_H/2;
-  const tx=tt.x+PM_COL_W/2, ty=tt.y+PM_HDR_H+tci*PM_ROW_H+PM_ROW_H/2;
+  const fx=ft.x+PM_COL_W/2, fy=ft.y+PM_HDR_H+PM_SUBHDR_H+fci*PM_ROW_H+PM_ROW_H/2;
+  const tx=tt.x+PM_COL_W/2, ty=tt.y+PM_HDR_H+PM_SUBHDR_H+tci*PM_ROW_H+PM_ROW_H/2;
   const my=(fy+ty)/2;
   const d=`M${fx} ${fy} C${fx} ${my},${tx} ${my},${tx} ${ty}`;
   const ns='http://www.w3.org/2000/svg';
@@ -3775,7 +3799,7 @@ function pmShowTbar(tblId) {
 function pmShowCbar(tblId,colId) {
   const tbl=SP.tables.find(t=>t.id===tblId); if(!tbl) return;
   const ci=tbl.columns.findIndex(c=>c.id===colId); if(ci<0) return;
-  const sc=pmToScreen(tbl.x+PM_COL_W, tbl.y+PM_HDR_H+ci*PM_ROW_H+PM_ROW_H/2);
+  const sc=pmToScreen(tbl.x+PM_COL_W, tbl.y+PM_HDR_H+PM_SUBHDR_H+ci*PM_ROW_H+PM_ROW_H/2);
   const wr=$pmWrap.getBoundingClientRect();
   $pmCbar.style.left=(sc.x-wr.left+10)+'px';
   $pmCbar.style.top=(sc.y-wr.top-60)+'px';
@@ -3784,6 +3808,7 @@ function pmShowCbar(tblId,colId) {
   document.getElementById('pm-col-pk').style.borderColor=col.pk?'#C2410C':'transparent';
   document.getElementById('pm-col-fk-tog').style.borderColor=col.fk?'#2563EB':'transparent';
   document.getElementById('pm-col-nn').style.borderColor=col.nn?'#374151':'transparent';
+  document.getElementById('pm-col-note').value=col.note||'';
   const sel=document.getElementById('pm-col-type');
   // Try to match, else set first option
   let found=false;
@@ -3892,12 +3917,12 @@ function pmOpenNameEdit(tblId) {
 function pmOpenColEdit(tblId,colId) {
   const tbl=SP.tables.find(t=>t.id===tblId); if(!tbl) return;
   const ci=tbl.columns.findIndex(c=>c.id===colId); if(ci<0) return;
-  const sc=pmToScreen(tbl.x,tbl.y+PM_HDR_H+ci*PM_ROW_H);
+  const sc=pmToScreen(tbl.x,tbl.y+PM_HDR_H+PM_SUBHDR_H+ci*PM_ROW_H);
   const wr=$pmWrap.getBoundingClientRect();
   $pmEdit.style.display='block';
   $pmEdit.style.left=(sc.x-wr.left)+'px';
   $pmEdit.style.top=(sc.y-wr.top)+'px';
-  $pmEdit.style.width=(PM_COL_W*SP.zoom)+'px';
+  $pmEdit.style.width=(PM_NAME_W*SP.zoom)+'px';
   $pmEdit.value=tbl.columns[ci].name; $pmEdit.dataset.editType='col'; $pmEdit.dataset.tableId=tblId; $pmEdit.dataset.colId=colId;
   $pmEdit.focus(); $pmEdit.select();
 }
@@ -3913,7 +3938,7 @@ $pmEdit.addEventListener('keydown',e=>{if(e.key==='Enter')pmCommitEdit();if(e.ke
 
 // ── Place table ───────────────────────────────────────────────────────────────
 function pmPlaceTable(x,y) {
-  const tbl={id:'pt'+(SP.nextId++),name:'新表格',x,y,columns:[{id:'pc'+(SP.nextId++),name:'id',type:'INT',pk:true,fk:false,nn:true}]};
+  const tbl={id:'pt'+(SP.nextId++),name:'新表格',x,y,columns:[{id:'pc'+(SP.nextId++),name:'id',type:'INT',pk:true,fk:false,nn:true,note:'主鍵'}]};
   SP.tables.push(tbl); pmRenderTable(tbl);
   SP.placingTable=false;
   document.getElementById('pm-add-table-btn').classList.remove('active');
@@ -3953,7 +3978,7 @@ document.getElementById('pm-add-table-btn').addEventListener('click',()=>{
 document.getElementById('pm-btn-fit').addEventListener('click',()=>{
   if(!SP.tables.length) return;
   let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
-  SP.tables.forEach(t=>{x0=Math.min(x0,t.x);y0=Math.min(y0,t.y);x1=Math.max(x1,t.x+PM_COL_W);y1=Math.max(y1,t.y+PM_HDR_H+t.columns.length*PM_ROW_H);});
+  SP.tables.forEach(t=>{x0=Math.min(x0,t.x);y0=Math.min(y0,t.y);x1=Math.max(x1,t.x+PM_COL_W);y1=Math.max(y1,t.y+PM_HDR_H+PM_SUBHDR_H+t.columns.length*PM_ROW_H);});
   const W=$pmSvg.clientWidth,H=$pmSvg.clientHeight,pad=80;
   SP.zoom=Math.min(5,Math.min((W-pad*2)/(x1-x0||1),(H-pad*2)/(y1-y0||1)));
   SP.pan.x=(W-(x0+x1)*SP.zoom)/2; SP.pan.y=(H-(y0+y1)*SP.zoom)/2;
@@ -3965,7 +3990,7 @@ document.getElementById('pm-btn-redo').addEventListener('click',pmRedo);
 document.getElementById('pm-tb-add-col').addEventListener('click',e=>{
   e.stopPropagation(); if(!SP.selectedTableId) return;
   const tbl=SP.tables.find(t=>t.id===SP.selectedTableId); if(!tbl) return;
-  const newCol={id:'pc'+(SP.nextId++),name:'欄位',type:'VARCHAR(255)',pk:false,fk:false,nn:false};
+  const newCol={id:'pc'+(SP.nextId++),name:'欄位',type:'VARCHAR(255)',pk:false,fk:false,nn:false,note:''};
   tbl.columns.push(newCol); pmRefreshTable(tbl.id);
   SP.selectedColId={tableId:tbl.id,colId:newCol.id};
   pmHideTbar(); pmShowCbar(tbl.id,newCol.id); pmOpenColEdit(tbl.id,newCol.id);
@@ -4016,7 +4041,7 @@ document.getElementById('pm-col-ins-before').addEventListener('click',e=>{
   e.stopPropagation(); const sc=SP.selectedColId; if(!sc) return;
   const tbl=SP.tables.find(t=>t.id===sc.tableId); if(!tbl) return;
   const ci=tbl.columns.findIndex(c=>c.id===sc.colId); if(ci<0) return;
-  tbl.columns.splice(ci,0,{id:'pc'+(SP.nextId++),name:'欄位',type:'VARCHAR(255)',pk:false,fk:false,nn:false});
+  tbl.columns.splice(ci,0,{id:'pc'+(SP.nextId++),name:'欄位',type:'VARCHAR(255)',pk:false,fk:false,nn:false,note:''});
   pmRefreshTable(tbl.id); pmShowCbar(sc.tableId,sc.colId); pmSnapshot(); pmScheduleSave();
 });
 document.getElementById('pm-col-ins-after').addEventListener('click',e=>{
@@ -4028,6 +4053,19 @@ document.getElementById('pm-col-ins-after').addEventListener('click',e=>{
 });
 document.getElementById('pm-col-rename').addEventListener('click',e=>{
   e.stopPropagation(); const sc=SP.selectedColId; if(!sc) return; pmOpenColEdit(sc.tableId,sc.colId);
+});
+const $pmColNote = document.getElementById('pm-col-note');
+$pmColNote.addEventListener('mousedown', e=>e.stopPropagation());
+$pmColNote.addEventListener('click', e=>e.stopPropagation());
+$pmColNote.addEventListener('input', e=>{
+  const sc=SP.selectedColId; if(!sc) return;
+  const tbl=SP.tables.find(t=>t.id===sc.tableId);
+  const col=tbl?.columns.find(c=>c.id===sc.colId); if(!col) return;
+  col.note=e.target.value; pmRefreshTable(tbl.id);
+});
+$pmColNote.addEventListener('blur', ()=>{
+  const sc=SP.selectedColId; if(!sc) return;
+  pmSnapshot(); pmScheduleSave();
 });
 document.getElementById('pm-col-del').addEventListener('click',e=>{
   e.stopPropagation(); const sc=SP.selectedColId; if(!sc) return;
@@ -4102,13 +4140,13 @@ document.getElementById('pm-btn-import').addEventListener('click',async()=>{
     const newTbls=[];
     (lmData.tables||[]).forEach(lt=>{
       if(SP.tables.find(t=>t.name===lt.name))return;
-      const columns=lt.columns.map(lc=>({id:'pc'+(SP.nextId++),name:lc.name,type:'VARCHAR(255)',pk:lc.pk||false,fk:lc.fk||false,nn:lc.pk||false}));
+      const columns=lt.columns.map(lc=>({id:'pc'+(SP.nextId++),name:lc.name,type:'VARCHAR(255)',pk:lc.pk||false,fk:lc.fk||false,nn:lc.pk||false,note:lc.pk?'主鍵':lc.fk?'外部鍵':''}));
       newTbls.push({id:'pt'+(SP.nextId++),name:lt.name,x:0,y:0,columns});
     });
     // Layout
     let cx=80,cy=80;const MAX_W=900,GAP_X=60,GAP_Y=60;
     newTbls.forEach(tbl=>{
-      const h=PM_HDR_H+tbl.columns.length*PM_ROW_H;
+      const h=PM_HDR_H+PM_SUBHDR_H+tbl.columns.length*PM_ROW_H;
       if(cx>80&&cx+PM_COL_W>MAX_W){cx=80;cy+=h+GAP_Y;}
       tbl.x=cx;tbl.y=cy;cx+=PM_COL_W+GAP_X;
     });
@@ -4172,7 +4210,9 @@ function pmGenerateSQL(dialect) {
       let typePart = adaptType(col.type || 'VARCHAR(255)', col.pk, dialect);
       const nnPart = col.nn || col.pk ? ' NOT NULL' : '';
       const autoInc = col.pk && (dialect === 'mysql') && ((col.type||'').toUpperCase() === 'INT' || (col.type||'').toUpperCase() === 'BIGINT') ? ' AUTO_INCREMENT' : '';
-      colDefs.push(`  ${q(col.name)} ${typePart}${autoInc}${nnPart}`);
+      const commentPart = col.note ? (dialect==='mysql' ? ` COMMENT '${col.note.replace(/'/g,"''")}'` : '') : '';
+      const inlineNote = col.note && dialect!=='mysql' ? ` -- ${col.note}` : '';
+      colDefs.push(`  ${q(col.name)} ${typePart}${autoInc}${nnPart}${commentPart}${inlineNote}`);
     });
 
     if (pkCols.length) {
@@ -4192,6 +4232,12 @@ function pmGenerateSQL(dialect) {
 
     lines.push(colDefs.join(',\n'));
     lines.push(');');
+    // PostgreSQL COMMENT ON COLUMN
+    if (dialect === 'postgresql') {
+      tbl.columns.filter(c=>c.note).forEach(col => {
+        lines.push(`COMMENT ON COLUMN ${q(tbl.name)}.${q(col.name)} IS '${col.note.replace(/'/g,"''")}';`);
+      });
+    }
   });
 
   return lines.join('\n');
