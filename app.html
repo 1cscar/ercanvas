@@ -206,6 +206,17 @@
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
         新增邏輯模型
       </button>
+      <button id="btn-new-physical"
+        class="flex items-center justify-center gap-2 bg-emerald-600 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-emerald-700 active:bg-emerald-800 transition-colors shadow-sm shadow-emerald-200">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+        新增實體模型
+      </button>
+      <div class="flex-1"></div>
+      <button id="btn-report-bug"
+        class="flex items-center justify-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors mt-auto">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v4M8 11v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        問題回報
+      </button>
       <nav class="space-y-0.5 mt-1">
         <div class="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium cursor-pointer select-none">
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 3h5l1.5 1.5H14v9H2V3z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
@@ -402,6 +413,7 @@
           <button id="tb-connect" style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#EFF6FF;color:#2563EB;text-align:left;">連線</button>
           <button id="tb-add"     style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#F0FDF4;color:#16A34A;text-align:left;">新增</button>
           <button id="tb-copy"    style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#F5F3FF;color:#7C3AED;text-align:left;">複製</button>
+          <button id="tb-lock"    style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:1.5px solid transparent;cursor:pointer;background:#FFFBEB;color:#92400E;text-align:left;">🔓 鎖定</button>
           <button id="tb-delete"  style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#FEF2F2;color:#DC2626;text-align:left;">刪除</button>
         </div>
       </div>
@@ -422,10 +434,65 @@
       <!-- Context menu -->
       <div id="ctx-menu" style="display:none; position:absolute; z-index:300; background:white; border:1px solid #e5e7eb; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.12); padding:4px;">
         <button id="ctx-del-edge" style="display:block;width:100%;font-size:12px;padding:6px 14px;border-radius:6px;border:none;background:transparent;cursor:pointer;text-align:left;color:#DC2626;">刪除連線</button>
+        <button id="ctx-edit-card" style="display:block;width:100%;font-size:12px;padding:6px 14px;border-radius:6px;border:none;background:transparent;cursor:pointer;text-align:left;color:#374151;">設定基數標記</button>
+      </div>
+
+      <!-- Cardinality edit popup -->
+      <div id="card-popup" style="display:none; position:absolute; z-index:310; background:white; border:1px solid #e5e7eb; border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,0.14); padding:10px 12px; min-width:170px;">
+        <p style="font-size:10px;color:#6b7280;font-weight:600;margin-bottom:6px;letter-spacing:.5px;">基數標記</p>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+          <span style="font-size:10px;color:#6b7280;flex-shrink:0;width:30px;">來源</span>
+          <input id="card-from-input" type="text" placeholder="e.g. 1, n, m" style="flex:1;font-size:12px;border:1px solid #d1d5db;border-radius:6px;padding:3px 7px;outline:none;font-weight:600;"/>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+          <span style="font-size:10px;color:#6b7280;flex-shrink:0;width:30px;">目標</span>
+          <input id="card-to-input"   type="text" placeholder="e.g. n, 1, m" style="flex:1;font-size:12px;border:1px solid #d1d5db;border-radius:6px;padding:3px 7px;outline:none;font-weight:600;"/>
+        </div>
+        <div style="display:flex;gap-6px; flex-wrap:wrap; gap:4px; margin-bottom:8px;">
+          <button class="card-preset" data-from="1" data-to="1" style="font-size:10px;padding:2px 7px;border:1px solid #e5e7eb;border-radius:5px;background:#f9fafb;cursor:pointer;">1:1</button>
+          <button class="card-preset" data-from="1" data-to="n" style="font-size:10px;padding:2px 7px;border:1px solid #e5e7eb;border-radius:5px;background:#f9fafb;cursor:pointer;">1:n</button>
+          <button class="card-preset" data-from="n" data-to="1" style="font-size:10px;padding:2px 7px;border:1px solid #e5e7eb;border-radius:5px;background:#f9fafb;cursor:pointer;">n:1</button>
+          <button class="card-preset" data-from="m" data-to="n" style="font-size:10px;padding:2px 7px;border:1px solid #e5e7eb;border-radius:5px;background:#f9fafb;cursor:pointer;">m:n</button>
+        </div>
+        <div style="display:flex;gap:5px;justify-content:flex-end;">
+          <button id="card-cancel" style="font-size:11px;padding:3px 10px;border:1px solid #e5e7eb;border-radius:6px;background:white;cursor:pointer;color:#6b7280;">取消</button>
+          <button id="card-ok"     style="font-size:11px;padding:3px 10px;border:none;border-radius:6px;background:#2563EB;color:white;cursor:pointer;font-weight:600;">確定</button>
+        </div>
       </div>
 
       <!-- Status hint -->
       <div id="status-hint" style="display:none; position:absolute; bottom:14px; left:50%; transform:translateX(-50%); background:#1f2937; color:white; font-size:11px; padding:5px 16px; border-radius:20px; pointer-events:none; white-space:nowrap;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Bug Report Modal -->
+<div id="bug-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; align-items:center; justify-content:center;">
+  <div style="background:white; border-radius:16px; box-shadow:0 8px 40px rgba(0,0,0,0.2); padding:24px; width:460px; max-width:95vw; max-height:90vh; overflow-y:auto; position:relative;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+      <div>
+        <h2 style="font-size:15px; font-weight:700; color:#111827; margin:0 0 3px;">問題回報</h2>
+        <p style="font-size:11px; color:#6b7280; margin:0;">有任何問題、建議、bug 等等可透過文字描述或照片回報</p>
+      </div>
+      <button id="bug-modal-close" style="width:28px;height:28px;border-radius:50%;border:1px solid #e5e7eb;background:white;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">✕</button>
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px;">描述問題</label>
+      <textarea id="bug-desc" rows="5" placeholder="請描述你遇到的問題、步驟、建議或期望的行為…" style="width:100%;box-sizing:border-box;font-size:12px;border:1px solid #d1d5db;border-radius:8px;padding:8px 10px;outline:none;resize:vertical;font-family:sans-serif;line-height:1.5;"></textarea>
+    </div>
+    <div style="margin-bottom:16px;">
+      <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:5px;">附上截圖（選填）</label>
+      <label id="bug-img-label" style="display:flex;align-items:center;gap:8px;border:1.5px dashed #d1d5db;border-radius:8px;padding:10px 14px;cursor:pointer;transition:border-color .15s;">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="2" stroke="#9ca3af" stroke-width="1.5"/><circle cx="5.5" cy="7" r="1.5" fill="#9ca3af"/><path d="M1 11l3.5-3.5L7 10l3-3 5 4" stroke="#9ca3af" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span id="bug-img-name" style="font-size:11px;color:#9ca3af;">點擊選擇圖片</span>
+        <input id="bug-img-input" type="file" accept="image/*" style="display:none;"/>
+      </label>
+      <img id="bug-img-preview" src="" alt="" style="display:none;max-width:100%;max-height:140px;border-radius:6px;margin-top:8px;border:1px solid #e5e7eb;"/>
+    </div>
+    <div id="bug-status" style="font-size:11px;color:#059669;min-height:14px;margin-bottom:10px;"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button id="bug-cancel" style="font-size:12px;padding:7px 16px;border:1px solid #e5e7eb;border-radius:8px;background:white;cursor:pointer;color:#374151;">取消</button>
+      <button id="bug-submit" style="font-size:12px;font-weight:600;padding:7px 16px;border:none;border-radius:8px;background:#2563EB;color:white;cursor:pointer;">送出回報</button>
     </div>
   </div>
 </div>
@@ -594,6 +661,172 @@
   </div>
 </div>
 
+<!-- ── Physical Model Screen ─────────────────────────────────────────────────── -->
+<div id="scr-physical" style="display:none; flex-direction:column; height:100vh;">
+
+  <header class="bg-white border-b border-gray-200 flex items-center px-4 h-12 flex-shrink-0 gap-3">
+    <button id="pm-btn-back-home" class="flex items-center gap-1.5 flex-shrink-0 group">
+      <div class="w-7 h-7 rounded-md bg-blue-600 flex items-center justify-center group-hover:bg-blue-700 transition-colors">
+        <svg width="15" height="15" viewBox="0 0 18 18" fill="none"><rect x="1" y="5" width="7" height="5" rx="1" fill="white"/><rect x="10" y="5" width="7" height="5" rx="1" fill="white" opacity=".7"/><line x1="8" y1="7.5" x2="10" y2="7.5" stroke="white" stroke-width="1.5"/></svg>
+      </div>
+      <span class="font-bold text-gray-900 text-sm hidden sm:block">ERCanvas</span>
+    </button>
+    <div class="w-px h-5 bg-gray-200"></div>
+    <div class="flex items-center gap-1.5">
+      <span class="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 font-semibold">實體模型</span>
+      <input id="pm-diagram-name" type="text" value="未命名實體模型"
+        class="text-sm font-semibold text-gray-800 bg-transparent border border-transparent hover:border-gray-200 focus:border-blue-400 rounded px-2 py-1 outline-none w-48"/>
+    </div>
+    <div class="flex-1"></div>
+    <span id="pm-save-status" class="text-xs text-gray-400">已儲存</span>
+    <button id="pm-btn-export-sql" class="text-xs text-emerald-700 border border-emerald-300 bg-emerald-50 rounded-lg px-3 py-1.5 hover:bg-emerald-100 transition-colors flex-shrink-0">匯出 SQL DDL</button>
+    <button id="pm-btn-import" class="text-xs text-emerald-600 border border-emerald-200 bg-emerald-50 rounded-lg px-3 py-1.5 hover:bg-emerald-100 transition-colors flex-shrink-0" style="display:none;">從邏輯模型匯入</button>
+    <button id="pm-btn-link-lm" class="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors flex-shrink-0">連結邏輯模型</button>
+    <img id="pm-user-avatar" src="" alt="" class="w-7 h-7 rounded-full border border-gray-200 flex-shrink-0" style="display:none"/>
+    <button id="pm-btn-logout" class="text-xs text-gray-400 hover:text-gray-700 transition-colors">登出</button>
+  </header>
+
+  <!-- Readonly / shared mode banner (physical) -->
+  <div id="pm-share-mode-bar" style="display:none; flex-shrink:0; padding:6px 16px; font-size:12px; font-weight:500; text-align:center; border-bottom:1px solid transparent;"></div>
+
+  <div class="bg-white border-b border-gray-100 flex items-center px-3 h-9 flex-shrink-0 gap-1 select-none">
+    <button id="pm-btn-undo" disabled class="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 7L1 5l2-2"/><path d="M1 5h8a4 4 0 0 1 0 8H5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>上一步
+    </button>
+    <button id="pm-btn-redo" disabled class="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+      下一步<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M13 7l2-2-2-2"/><path d="M15 5H7a4 4 0 0 0 0 8h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="w-px h-4 bg-gray-200 mx-1"></div>
+    <button id="pm-add-table-btn" class="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors">
+      <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>新增表格
+    </button>
+    <div class="flex-1"></div>
+    <button id="pm-btn-fit" class="text-xs text-gray-500 px-2 py-1 rounded-md hover:bg-gray-100 transition-colors">全覽</button>
+    <span class="text-xs text-gray-400 px-1" id="pm-zoom-label">100%</span>
+  </div>
+
+  <div class="flex flex-1 overflow-hidden">
+    <aside style="width:150px;background:white;border-right:1px solid #e5e7eb;padding:12px;display:flex;flex-direction:column;gap:8px;flex-shrink:0;">
+      <p style="font-size:10px;font-weight:700;color:#6b7280;letter-spacing:.5px;margin-bottom:2px;">點擊後在畫布放置</p>
+      <div id="pm-add-table-item" style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;cursor:pointer;border:1.5px solid #e5e7eb;transition:all .15s;user-select:none;" onmouseenter="this.style.background='#ECFDF5';this.style.borderColor='#6EE7B7'" onmouseleave="this.style.background='';this.style.borderColor='#e5e7eb'">
+        <svg width="18" height="14" viewBox="0 0 22 18" fill="none"><rect x="1" y="1" width="20" height="16" rx="2" fill="white" stroke="#374151" stroke-width="1.5"/><line x1="1" y1="6" x2="21" y2="6" stroke="#374151" stroke-width="1.2"/></svg>
+        <span style="font-size:12px;font-weight:600;color:#374151;">資料表</span>
+      </div>
+      <p style="font-size:10px;color:#9ca3af;margin-top:4px;line-height:1.4;">雙擊欄位改名<br/>點擊欄位設定型別</p>
+    </aside>
+
+    <div id="pm-canvas-wrap" style="flex:1;overflow:hidden;position:relative;background:#f8fafc;">
+      <svg id="pm-svg" style="width:100%;height:100%;display:block;">
+        <defs>
+          <pattern id="pm-grid" width="24" height="24" patternUnits="userSpaceOnUse">
+            <path d="M24 0L0 0 0 24" fill="none" stroke="rgba(148,163,184,0.2)" stroke-width="1"/>
+          </pattern>
+          <marker id="pm-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#374151"/>
+          </marker>
+        </defs>
+        <rect width="100%" height="100%" fill="#f8fafc"/>
+        <rect width="100%" height="100%" fill="url(#pm-grid)"/>
+        <g id="pm-root">
+          <g id="pm-table-layer"></g>
+          <g id="pm-fk-layer"></g>
+        </g>
+      </svg>
+      <input id="pm-inline-edit" type="text" style="position:absolute;display:none;z-index:200;background:rgba(255,255,255,0.92);border:2px solid #2563EB;border-radius:5px;padding:3px 8px;outline:none;text-align:center;min-width:80px;font-size:12px;"/>
+
+      <!-- Table toolbar (physical) -->
+      <div id="pm-table-toolbar" style="display:none; position:absolute; z-index:150;">
+        <div style="display:flex;flex-direction:column;gap:3px;background:white;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.1);padding:5px;min-width:96px;">
+          <button id="pm-tb-add-col"    style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#F0FDF4;color:#16A34A;text-align:left;">＋ 新增欄位</button>
+          <button id="pm-tb-fk-connect" style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#F5F3FF;color:#7C3AED;text-align:left;">FK 連線</button>
+          <hr style="border:none;border-top:1px solid #f1f5f9;margin:1px 0;"/>
+          <button id="pm-tb-rename"     style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:1.5px solid #e5e7eb;cursor:pointer;background:white;color:#374151;text-align:left;">改名</button>
+          <button id="pm-tb-del-table"  style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#FEF2F2;color:#DC2626;text-align:left;">刪除</button>
+        </div>
+      </div>
+
+      <!-- Column toolbar (physical) -->
+      <div id="pm-col-toolbar" style="display:none; position:absolute; z-index:160;">
+        <div style="display:flex;flex-direction:column;gap:3px;background:white;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.1);padding:5px;min-width:130px;">
+          <button id="pm-col-ins-before" style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#F0FDF4;color:#16A34A;text-align:left;">← 往前插入</button>
+          <button id="pm-col-ins-after"  style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#F0FDF4;color:#16A34A;text-align:left;">往後插入 →</button>
+          <hr style="border:none;border-top:1px solid #f1f5f9;margin:1px 0;"/>
+          <button id="pm-col-pk"         style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:1.5px solid transparent;cursor:pointer;background:#FFF7ED;color:#C2410C;text-align:left;">PK 主鍵</button>
+          <button id="pm-col-fk-tog"     style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:1.5px solid transparent;cursor:pointer;background:#EFF6FF;color:#2563EB;text-align:left;">FK 外鍵</button>
+          <button id="pm-col-nn"         style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:1.5px solid transparent;cursor:pointer;background:#F9FAFB;color:#374151;text-align:left;">NN 非空</button>
+          <button id="pm-col-fk-connect" style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#F5F3FF;color:#7C3AED;text-align:left;">連線</button>
+          <hr style="border:none;border-top:1px solid #f1f5f9;margin:1px 0;"/>
+          <div style="padding:2px 4px;">
+            <select id="pm-col-type" style="width:100%;font-size:11px;border:1px solid #d1d5db;border-radius:6px;padding:3px 5px;outline:none;cursor:pointer;">
+              <option value="INT">INT</option>
+              <option value="BIGINT">BIGINT</option>
+              <option value="SMALLINT">SMALLINT</option>
+              <option value="VARCHAR(255)" selected>VARCHAR(255)</option>
+              <option value="VARCHAR(100)">VARCHAR(100)</option>
+              <option value="CHAR(10)">CHAR(10)</option>
+              <option value="TEXT">TEXT</option>
+              <option value="FLOAT">FLOAT</option>
+              <option value="DOUBLE">DOUBLE</option>
+              <option value="DECIMAL(10,2)">DECIMAL(10,2)</option>
+              <option value="DATE">DATE</option>
+              <option value="DATETIME">DATETIME</option>
+              <option value="TIMESTAMP">TIMESTAMP</option>
+              <option value="BOOLEAN">BOOLEAN</option>
+              <option value="BLOB">BLOB</option>
+            </select>
+          </div>
+          <hr style="border:none;border-top:1px solid #f1f5f9;margin:1px 0;"/>
+          <button id="pm-col-rename" style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:1.5px solid #e5e7eb;cursor:pointer;background:white;color:#374151;text-align:left;">改名</button>
+          <button id="pm-col-del"    style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#FEF2F2;color:#DC2626;text-align:left;">刪除</button>
+        </div>
+      </div>
+
+      <div id="pm-hint" style="position:absolute;bottom:14px;left:50%;transform:translateX(-50%);background:#1f2937;color:white;font-size:11px;padding:5px 14px;border-radius:20px;pointer-events:none;display:none;white-space:nowrap;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Link LM modal (physical) -->
+<div id="pm-link-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,0.18);padding:20px;width:340px;max-height:80vh;overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <h3 style="font-size:14px;font-weight:700;color:#111827;margin:0;">連結邏輯模型</h3>
+      <button id="pm-link-modal-close" style="border:none;background:none;cursor:pointer;font-size:16px;color:#6b7280;">✕</button>
+    </div>
+    <div id="pm-link-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:1px solid #f1f5f9;">
+      <span id="pm-bind-status" style="font-size:11px;color:#059669;"></span>
+      <button id="pm-bind-unlink" style="font-size:11px;color:#DC2626;border:none;background:none;cursor:pointer;padding:4px 8px;">解除連結</button>
+    </div>
+  </div>
+</div>
+
+<!-- SQL DDL Export Modal (physical) -->
+<div id="pm-sql-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,0.18);width:600px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #f1f5f9;flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <h3 style="font-size:14px;font-weight:700;color:#111827;margin:0;">匯出 SQL DDL</h3>
+        <select id="pm-sql-dialect" style="font-size:11px;border:1px solid #e5e7eb;border-radius:6px;padding:3px 8px;outline:none;cursor:pointer;color:#374151;">
+          <option value="mysql">MySQL</option>
+          <option value="postgresql">PostgreSQL</option>
+          <option value="sqlite">SQLite</option>
+          <option value="mssql">SQL Server</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button id="pm-sql-copy" style="font-size:11px;font-weight:600;padding:5px 14px;border-radius:7px;border:1px solid #d1d5db;background:white;cursor:pointer;color:#374151;">複製</button>
+        <button id="pm-sql-download" style="font-size:11px;font-weight:600;padding:5px 14px;border-radius:7px;border:none;background:#059669;cursor:pointer;color:white;">下載 .sql</button>
+        <button id="pm-sql-modal-close" style="border:none;background:none;cursor:pointer;font-size:18px;color:#9ca3af;line-height:1;padding:2px 6px;">✕</button>
+      </div>
+    </div>
+    <pre id="pm-sql-output" style="flex:1;overflow:auto;padding:16px 20px;margin:0;font-size:11.5px;font-family:'SF Mono','Fira Code','Courier New',monospace;line-height:1.7;color:#1e293b;background:#f8fafc;white-space:pre;"></pre>
+    <div style="padding:8px 20px;border-top:1px solid #f1f5f9;flex-shrink:0;">
+      <span id="pm-sql-copy-msg" style="font-size:11px;color:#059669;"></span>
+    </div>
+  </div>
+</div>
+
 <!-- ════════════════════════════════════════════════════════════════════════ -->
 <script type="module">
 import { initializeApp }       from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js';
@@ -693,12 +926,12 @@ const nEls = new Map(), eEls = new Map();
 
 // ── Screen manager ────────────────────────────────────────────────────────────
 function show(name) {
-  ['scr-loading','scr-setup','scr-login','scr-home','scr-app','scr-logical'].forEach(id => {
+  ['scr-loading','scr-setup','scr-login','scr-home','scr-app','scr-logical','scr-physical'].forEach(id => {
     document.getElementById(id).style.display = 'none';
   });
   const el = document.getElementById('scr-' + name);
   el.style.display = 'flex';
-  if (['app','home','logical'].includes(name)) el.style.flexDirection = 'column';
+  if (['app','home','logical','physical'].includes(name)) el.style.flexDirection = 'column';
 }
 
 // ── Local-first boot ─────────────────────────────────────────────────────────
@@ -951,11 +1184,12 @@ function renderDiagramCard(id, data) {
 
   card.addEventListener('click', () => {
     if (data.isShared) {
-      // Re-open via share URL so boot IIFE handles permission + RTDB correctly
       window.location.href = `app.html?share=${id}`;
       return;
     }
-    if ((data.diagramType || 'er') === 'logical') openLogicalDiagram(id, data);
+    const dt = data.diagramType || 'er';
+    if (dt === 'logical') openLogicalDiagram(id, data);
+    else if (dt === 'physical') openPhysicalDiagram(id, data);
     else openDiagram(id, data);
   });
   grid.appendChild(card);
@@ -1091,6 +1325,25 @@ document.getElementById('btn-new-logical').addEventListener('click', async () =>
     openLogicalDiagram(newRef.id, newData);
   } catch(e) { alert('新增失敗，請重試'); }
   finally { btn.disabled = false; }
+});
+
+document.getElementById('btn-new-physical').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-new-physical');
+  btn.disabled = true;
+  try {
+    const newRef = doc(collection(db, 'users', currentUser.uid, 'diagrams'));
+    const now = Date.now();
+    const newData = { diagramType:'physical', name:'未命名實體模型', tables:[], fkLinks:[], nextId:1, linkedLmDiagramId:null, updatedAt: now };
+    try { localStorage.setItem(diagKey(newRef.id), JSON.stringify({ id: newRef.id, ...newData })); } catch(e) {}
+    try {
+      const list = loadListCache() || [];
+      list.unshift({ id: newRef.id, name: newData.name, updatedAt: now, nodeCount: 0, diagramType:'physical' });
+      localStorage.setItem(listKey(), JSON.stringify(list));
+    } catch(e) {}
+    await setDoc(doc(db, 'users', currentUser.uid, 'diagrams', newRef.id), { ...newData, updatedAt: serverTimestamp() });
+    openPhysicalDiagram(newRef.id, newData);
+  } catch(e) { console.error(e); }
+  btn.disabled = false;
 });
 
 // ── Save / Load ───────────────────────────────────────────────────────────────
@@ -1418,6 +1671,29 @@ function renderEdge(edge) {
   line.setAttribute('x2',a2.x); line.setAttribute('y2',a2.y);
   line.setAttribute('stroke','#374151'); line.setAttribute('stroke-width','1.5');
   g.appendChild(line);
+  // Cardinality labels near each endpoint
+  const dx=a2.x-a1.x, dy=a2.y-a1.y, len=Math.sqrt(dx*dx+dy*dy)||1;
+  const LOFF=16; // offset along line from endpoint
+  // perpendicular offset to float label above the line
+  const px=-dy/len*9, py=dx/len*9;
+  if (edge.labelFrom) {
+    const t=svgEl('text');
+    t.setAttribute('x', a1.x+dx/len*LOFF+px); t.setAttribute('y', a1.y+dy/len*LOFF+py);
+    t.setAttribute('font-size','12'); t.setAttribute('font-weight','600');
+    t.setAttribute('font-family','sans-serif'); t.setAttribute('fill','#374151');
+    t.setAttribute('text-anchor','middle'); t.setAttribute('dominant-baseline','middle');
+    t.setAttribute('pointer-events','none'); t.textContent=edge.labelFrom;
+    g.appendChild(t);
+  }
+  if (edge.labelTo) {
+    const t=svgEl('text');
+    t.setAttribute('x', a2.x-dx/len*LOFF+px); t.setAttribute('y', a2.y-dy/len*LOFF+py);
+    t.setAttribute('font-size','12'); t.setAttribute('font-weight','600');
+    t.setAttribute('font-family','sans-serif'); t.setAttribute('fill','#374151');
+    t.setAttribute('text-anchor','middle'); t.setAttribute('dominant-baseline','middle');
+    t.setAttribute('pointer-events','none'); t.textContent=edge.labelTo;
+    g.appendChild(t);
+  }
   const hit=svgEl('line');
   hit.setAttribute('x1',a1.x); hit.setAttribute('y1',a1.y);
   hit.setAttribute('x2',a2.x); hit.setAttribute('y2',a2.y);
@@ -1587,6 +1863,10 @@ function updateToolbarVisibility() {
     document.getElementById('tb-connect').style.display = '';
     document.getElementById('tb-add').style.display = '';
     document.getElementById('tb-copy').style.display = '';
+    const _lockNode = S.nodes.find(n=>n.id===[...S.selectedIds][0]);
+    const _tbLock = document.getElementById('tb-lock');
+    if (_lockNode?.locked) { _tbLock.textContent='🔒 解鎖'; _tbLock.style.borderColor='#92400E'; }
+    else { _tbLock.textContent='🔓 鎖定'; _tbLock.style.borderColor='transparent'; }
   } else if (S.selectedIds.size > 1) {
     $toolbar.style.display = 'block';
     document.getElementById('tb-connect').style.display = 'none';
@@ -1654,6 +1934,18 @@ document.getElementById('tb-copy').addEventListener('click', e => {
   newNodes.forEach(n => { S.selectedIds.add(n.id); nEls.get(n.id)?.classList.add('selected'); });
   if (newNodes.length===1) { renderHandles(newNodes[0].id); positionToolbar(newNodes[0].id); }
   updateToolbarVisibility();
+  snapshot(); scheduleSave();
+});
+
+document.getElementById('tb-lock').addEventListener('click', e => {
+  e.stopPropagation();
+  if (S.selectedIds.size !== 1) return;
+  const node = S.nodes.find(n => n.id === [...S.selectedIds][0]);
+  if (!node) return;
+  node.locked = !node.locked;
+  const btn = document.getElementById('tb-lock');
+  if (node.locked) { btn.textContent='🔒 解鎖'; btn.style.borderColor='#92400E'; }
+  else { btn.textContent='🔓 鎖定'; btn.style.borderColor='transparent'; }
   snapshot(); scheduleSave();
 });
 
@@ -1792,7 +2084,9 @@ $svg.addEventListener('mousedown', e => {
       const c = nodeCenter(n);
       return {node:n, offX:pt.x-c.x, offY:pt.y-c.y};
     }).filter(Boolean);
-    dragging = {nodes: dragNodes, preSnap: JSON.stringify({nodes: S.nodes, edges: S.edges, nextId: S.nextId})};
+    const _unlocked = dragNodes.filter(({node})=>!node.locked);
+    if (!_unlocked.length) return;
+    dragging = {nodes: _unlocked, preSnap: JSON.stringify({nodes: S.nodes, edges: S.edges, nextId: S.nextId})};
     didDrag = false;
     e.preventDefault();
   }
@@ -1822,6 +2116,7 @@ $svg.addEventListener('mousemove', e => {
   didDrag = true;
   const pt = toSVG(e.clientX, e.clientY);
   dragging.nodes.forEach(({node, offX, offY}) => {
+    if (node.locked) return;
     const nx=pt.x-offX, ny=pt.y-offY;
     if (node.type==='entity'||node.type==='weak-entity'||node.type==='aggregation') {node.x=nx-node.w/2; node.y=ny-node.h/2;}
     else {node.x=nx; node.y=ny;}
@@ -2104,6 +2399,42 @@ function clearConnecting() {
 }
 function hideToolbar() { $toolbar.style.display='none'; $picker.style.display='none'; }
 function hideCtxMenu() { $ctxMenu.style.display='none'; }
+
+// ── Cardinality popup ─────────────────────────────────────────────────────────
+let _cardEdgeId = null;
+document.getElementById('ctx-edit-card').addEventListener('click', e => {
+  e.stopPropagation();
+  hideCtxMenu();
+  const edge = S.edges.find(ed=>ed.id===S.selectedEdgeId); if(!edge) return;
+  _cardEdgeId = edge.id;
+  const popup = document.getElementById('card-popup');
+  popup.style.left = $ctxMenu.style.left;
+  popup.style.top  = (parseInt($ctxMenu.style.top||0)-20)+'px';
+  document.getElementById('card-from-input').value = edge.labelFrom||'';
+  document.getElementById('card-to-input').value   = edge.labelTo||'';
+  popup.style.display='block';
+  document.getElementById('card-from-input').focus();
+});
+document.querySelectorAll('.card-preset').forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    document.getElementById('card-from-input').value = btn.dataset.from;
+    document.getElementById('card-to-input').value   = btn.dataset.to;
+  });
+});
+document.getElementById('card-ok').addEventListener('click', e => {
+  e.stopPropagation();
+  const edge = S.edges.find(ed=>ed.id===_cardEdgeId); if(!edge) return;
+  edge.labelFrom = document.getElementById('card-from-input').value.trim()||undefined;
+  edge.labelTo   = document.getElementById('card-to-input').value.trim()||undefined;
+  eEls.get(edge.id)?.remove(); eEls.delete(edge.id); renderEdge(edge);
+  document.getElementById('card-popup').style.display='none';
+  snapshot(); scheduleSave();
+});
+document.getElementById('card-cancel').addEventListener('click', e => {
+  e.stopPropagation();
+  document.getElementById('card-popup').style.display='none';
+});
 function setHint(msg) { $hint.textContent=msg; $hint.style.display='block'; }
 function clearHint() { $hint.style.display='none'; }
 
@@ -3283,6 +3614,730 @@ document.addEventListener('keydown', e=>{
   if((e.ctrlKey||e.metaKey)&&e.key==='z'){ e.preventDefault(); lmUndo(); return; }
   if((e.ctrlKey||e.metaKey)&&(e.key==='y'||(e.shiftKey&&e.key==='z'))){ e.preventDefault(); lmRedo(); return; }
   if((e.ctrlKey||e.metaKey)&&e.key==='s'){ e.preventDefault(); lmScheduleSave(); return; }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PHYSICAL DATA MODEL EDITOR
+// ══════════════════════════════════════════════════════════════════════════════
+
+const SP = {
+  tables: [], fkLinks: [], nextId: 1,
+  selectedTableId: null,
+  selectedColId: null,
+  placingTable: false,
+  fkConnecting: null,
+  pan: { x:100, y:80 }, zoom: 1,
+  linkedLmDiagramId: null,
+};
+const HP = { stack: [], idx: -1, max: 80 };
+
+function pmSnapshot() {
+  const s = JSON.stringify({ tables:SP.tables, fkLinks:SP.fkLinks, nextId:SP.nextId });
+  HP.stack = HP.stack.slice(0, HP.idx+1); HP.stack.push(s);
+  if (HP.stack.length > HP.max) HP.stack.shift();
+  HP.idx = HP.stack.length - 1; pmSyncUR();
+}
+function pmUndo() { if(HP.idx<=0) return; HP.idx--; const s=JSON.parse(HP.stack[HP.idx]); SP.tables=s.tables;SP.fkLinks=s.fkLinks;SP.nextId=s.nextId;SP.selectedTableId=null;SP.selectedColId=null;SP.fkConnecting=null;pmRenderAll();pmSyncUR();pmScheduleSave();pmClearHint(); }
+function pmRedo() { if(HP.idx>=HP.stack.length-1) return; HP.idx++; const s=JSON.parse(HP.stack[HP.idx]); SP.tables=s.tables;SP.fkLinks=s.fkLinks;SP.nextId=s.nextId;SP.selectedTableId=null;SP.selectedColId=null;SP.fkConnecting=null;pmRenderAll();pmSyncUR();pmScheduleSave();pmClearHint(); }
+function pmSyncUR() { const u=document.getElementById('pm-btn-undo'),r=document.getElementById('pm-btn-redo'); if(u)u.disabled=HP.idx<=0; if(r)r.disabled=HP.idx>=HP.stack.length-1; }
+
+const $pmSvg  = document.getElementById('pm-svg');
+const $pmRoot = document.getElementById('pm-root');
+const $pmFkL  = document.getElementById('pm-fk-layer');
+const $pmTblL = document.getElementById('pm-table-layer');
+const $pmWrap = document.getElementById('pm-canvas-wrap');
+const $pmEdit = document.getElementById('pm-inline-edit');
+const $pmTbar = document.getElementById('pm-table-toolbar');
+const $pmCbar = document.getElementById('pm-col-toolbar');
+const $pmHint = document.getElementById('pm-hint');
+const pmTEls  = new Map();
+const pmFkEls = new Map();
+
+// ── Geometry ──────────────────────────────────────────────────────────────────
+const PM_ROW_H=26, PM_HDR_H=28, PM_COL_W=180;
+function pmToSVG(cx,cy) { const r=$pmSvg.getBoundingClientRect(); return {x:(cx-r.left-SP.pan.x)/SP.zoom,y:(cy-r.top-SP.pan.y)/SP.zoom}; }
+function pmToScreen(sx,sy) { const r=$pmSvg.getBoundingClientRect(); return {x:sx*SP.zoom+SP.pan.x+r.left,y:sy*SP.zoom+SP.pan.y+r.top}; }
+
+function pmApplyTransform() {
+  $pmRoot.setAttribute('transform',`translate(${SP.pan.x},${SP.pan.y}) scale(${SP.zoom})`);
+  const sz=24*SP.zoom, g=$pmSvg.querySelector('#pm-grid');
+  if(g){g.setAttribute('width',sz);g.setAttribute('height',sz);g.setAttribute('x',SP.pan.x%sz);g.setAttribute('y',SP.pan.y%sz);}
+  document.getElementById('pm-zoom-label').textContent=Math.round(SP.zoom*100)+'%';
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function pmRenderAll() {
+  $pmFkL.innerHTML=''; $pmTblL.innerHTML='';
+  pmFkEls.clear(); pmTEls.clear();
+  SP.fkLinks.forEach(pmRenderFk);
+  SP.tables.forEach(pmRenderTable);
+}
+
+function pmRenderTable(tbl) {
+  const ns='http://www.w3.org/2000/svg';
+  const mk=(tag,attrs)=>{ const el=document.createElementNS(ns,tag); Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,v)); return el; };
+  const g=document.createElementNS(ns,'g');
+  g.classList.add('pm-table'); g.dataset.id=tbl.id;
+  g.setAttribute('transform',`translate(${tbl.x},${tbl.y})`);
+  const isSel=SP.selectedTableId===tbl.id;
+  const totalH=PM_HDR_H+tbl.columns.length*PM_ROW_H;
+  // Shadow rect
+  const shadow=mk('rect',{x:2,y:2,width:PM_COL_W,height:totalH,rx:4,fill:'rgba(0,0,0,0.06)'});
+  g.appendChild(shadow);
+  // Outer border
+  const border=mk('rect',{x:0,y:0,width:PM_COL_W,height:totalH,rx:4,fill:'white',stroke:isSel?'#2563EB':'#374151','stroke-width':isSel?2:1.5});
+  g.appendChild(border);
+  // Header background
+  const hdr=mk('rect',{x:0,y:0,width:PM_COL_W,height:PM_HDR_H,rx:4,fill:isSel?'#EFF6FF':'#F9FAFB',stroke:isSel?'#2563EB':'#374151','stroke-width':isSel?2:1.5});
+  g.appendChild(hdr);
+  const hdrBottom=mk('line',{x1:0,y1:PM_HDR_H,x2:PM_COL_W,y2:PM_HDR_H,stroke:isSel?'#2563EB':'#374151','stroke-width':1.5});
+  g.appendChild(hdrBottom);
+  // Table name
+  const nameT=mk('text',{x:PM_COL_W/2,y:PM_HDR_H/2+1,'text-anchor':'middle','dominant-baseline':'middle','font-size':12,'font-weight':'700','font-family':'sans-serif',fill:isSel?'#1D4ED8':'#111827'});
+  nameT.textContent=tbl.name; g.appendChild(nameT);
+  // Drag zone on header
+  const dragZ=mk('rect',{x:0,y:0,width:PM_COL_W,height:PM_HDR_H,fill:'transparent'});
+  dragZ.style.cursor='move'; dragZ.dataset.tableId=tbl.id; dragZ.dataset.pmDragZone='1';
+  g.appendChild(dragZ);
+  // Columns
+  tbl.columns.forEach((col,i)=>{
+    const y=PM_HDR_H+i*PM_ROW_H;
+    const isSelCol=SP.selectedColId?.tableId===tbl.id&&SP.selectedColId?.colId===col.id;
+    const isFkSrc=SP.fkConnecting?.tableId===tbl.id&&SP.fkConnecting?.colId===col.id;
+    if(isSelCol||isFkSrc){
+      const bg=mk('rect',{x:0,y,width:PM_COL_W,height:PM_ROW_H,fill:isFkSrc?'#FEF9C3':'#EFF6FF'});
+      g.appendChild(bg);
+    }
+    // Row divider
+    if(i>0){const d=mk('line',{x1:0,y1:y,x2:PM_COL_W,y2:y,stroke:'#e5e7eb','stroke-width':1});g.appendChild(d);}
+    // Key indicators
+    const keyX=8;
+    if(col.pk){const kt=mk('text',{x:keyX,y:y+PM_ROW_H/2+1,'dominant-baseline':'middle','font-size':9,'font-weight':'700',fill:'#C2410C','font-family':'sans-serif'});kt.textContent='PK';g.appendChild(kt);}
+    else if(col.fk){const kt=mk('text',{x:keyX,y:y+PM_ROW_H/2+1,'dominant-baseline':'middle','font-size':9,'font-weight':'700',fill:'#2563EB','font-family':'sans-serif'});kt.textContent='FK';g.appendChild(kt);}
+    // Column name
+    const nameX=col.pk||col.fk?26:8;
+    const ct=mk('text',{x:nameX,y:y+PM_ROW_H/2+1,'dominant-baseline':'middle','font-size':11,'font-family':'sans-serif',fill:'#374151'});
+    if(col.pk)ct.setAttribute('font-weight','600');
+    if(col.nn)ct.setAttribute('text-decoration','underline');
+    ct.textContent=col.name; g.appendChild(ct);
+    // Data type (right-aligned)
+    const dt=mk('text',{x:PM_COL_W-6,y:y+PM_ROW_H/2+1,'text-anchor':'end','dominant-baseline':'middle','font-size':9,'font-family':'monospace',fill:'#9CA3AF'});
+    dt.textContent=col.type||'VARCHAR'; g.appendChild(dt);
+    // Hit area
+    const hit=mk('rect',{x:0,y,width:PM_COL_W,height:PM_ROW_H,fill:'transparent'});
+    hit.style.cursor='pointer'; hit.dataset.colId=col.id; hit.dataset.tableId=tbl.id;
+    g.appendChild(hit);
+  });
+  pmTEls.set(tbl.id,g); $pmTblL.appendChild(g);
+}
+
+function pmRenderFk(fk) {
+  const ft=SP.tables.find(t=>t.id===fk.fromTable),tt=SP.tables.find(t=>t.id===fk.toTable);
+  if(!ft||!tt) return;
+  const fci=ft.columns.findIndex(c=>c.id===fk.fromCol),tci=tt.columns.findIndex(c=>c.id===fk.toCol);
+  if(fci<0||tci<0) return;
+  const fx=ft.x+PM_COL_W/2, fy=ft.y+PM_HDR_H+fci*PM_ROW_H+PM_ROW_H/2;
+  const tx=tt.x+PM_COL_W/2, ty=tt.y+PM_HDR_H+tci*PM_ROW_H+PM_ROW_H/2;
+  const my=(fy+ty)/2;
+  const d=`M${fx} ${fy} C${fx} ${my},${tx} ${my},${tx} ${ty}`;
+  const ns='http://www.w3.org/2000/svg';
+  const g=document.createElementNS(ns,'g'); g.dataset.fkId=fk.id;
+  const path=document.createElementNS(ns,'path');
+  path.setAttribute('d',d);path.setAttribute('fill','none');
+  path.setAttribute('stroke','#374151');path.setAttribute('stroke-width','1.5');
+  path.setAttribute('marker-end','url(#pm-arrow)');path.style.pointerEvents='none';
+  g.appendChild(path);
+  const hit=document.createElementNS(ns,'path');
+  hit.setAttribute('d',d);hit.setAttribute('fill','none');
+  hit.setAttribute('stroke','transparent');hit.setAttribute('stroke-width','12');
+  hit.style.cursor='pointer'; hit.dataset.pmFkHit=fk.id;
+  g.appendChild(hit);
+  pmFkEls.set(fk.id,g); $pmFkL.appendChild(g);
+}
+
+function pmRefreshTable(tblId) {
+  const tbl=SP.tables.find(t=>t.id===tblId); if(!tbl) return;
+  pmTEls.get(tblId)?.remove(); pmTEls.delete(tblId); pmRenderTable(tbl);
+  SP.fkLinks.filter(fk=>fk.fromTable===tblId||fk.toTable===tblId).forEach(fk=>{
+    pmFkEls.get(fk.id)?.remove(); pmFkEls.delete(fk.id); pmRenderFk(fk);
+  });
+}
+
+// ── Toolbar helpers ───────────────────────────────────────────────────────────
+function pmShowTbar(tblId) {
+  const tbl=SP.tables.find(t=>t.id===tblId); if(!tbl) return;
+  const sc=pmToScreen(tbl.x+PM_COL_W, tbl.y+PM_HDR_H/2);
+  const wr=$pmWrap.getBoundingClientRect();
+  $pmTbar.style.left=(sc.x-wr.left+10)+'px';
+  $pmTbar.style.top=(sc.y-wr.top-20)+'px';
+  $pmTbar.style.display='block';
+}
+function pmShowCbar(tblId,colId) {
+  const tbl=SP.tables.find(t=>t.id===tblId); if(!tbl) return;
+  const ci=tbl.columns.findIndex(c=>c.id===colId); if(ci<0) return;
+  const sc=pmToScreen(tbl.x+PM_COL_W, tbl.y+PM_HDR_H+ci*PM_ROW_H+PM_ROW_H/2);
+  const wr=$pmWrap.getBoundingClientRect();
+  $pmCbar.style.left=(sc.x-wr.left+10)+'px';
+  $pmCbar.style.top=(sc.y-wr.top-60)+'px';
+  $pmCbar.style.display='block';
+  const col=tbl.columns[ci];
+  document.getElementById('pm-col-pk').style.borderColor=col.pk?'#C2410C':'transparent';
+  document.getElementById('pm-col-fk-tog').style.borderColor=col.fk?'#2563EB':'transparent';
+  document.getElementById('pm-col-nn').style.borderColor=col.nn?'#374151':'transparent';
+  const sel=document.getElementById('pm-col-type');
+  // Try to match, else set first option
+  let found=false;
+  for(let i=0;i<sel.options.length;i++){if(sel.options[i].value===col.type){sel.selectedIndex=i;found=true;break;}}
+  if(!found){const opt=document.createElement('option');opt.value=col.type||'VARCHAR(255)';opt.text=col.type||'VARCHAR(255)';sel.insertBefore(opt,sel.firstChild);sel.selectedIndex=0;}
+}
+function pmHideTbar() { $pmTbar.style.display='none'; }
+function pmHideCbar() { $pmCbar.style.display='none'; }
+function pmSetHint(m) { $pmHint.textContent=m; $pmHint.style.display='block'; }
+function pmClearHint() { $pmHint.style.display='none'; }
+
+// ── Mouse ─────────────────────────────────────────────────────────────────────
+let pmPanning=false,pmPanStart={x:0,y:0};
+let pmDragging=null,pmDidDrag=false;
+
+$pmSvg.addEventListener('mousedown', e => {
+  if($pmEdit.style.display==='block') return;
+  const fkHit=e.target.dataset.pmFkHit;
+  if(fkHit){ if(confirm('刪除此 FK 連線？')){SP.fkLinks=SP.fkLinks.filter(fk=>fk.id!==fkHit);pmFkEls.get(fkHit)?.remove();pmFkEls.delete(fkHit);pmSnapshot();pmScheduleSave();} return; }
+  const colEl=e.target.dataset.colId&&e.target.dataset.tableId?e.target:null;
+  if(colEl){
+    const tableId=colEl.dataset.tableId,colId=colEl.dataset.colId;
+    if(SP.fkConnecting?.tableId){
+      if(SP.fkConnecting.tableId!==tableId){
+        const fk={id:'pfk'+(SP.nextId++),fromTable:SP.fkConnecting.tableId,fromCol:SP.fkConnecting.colId,toTable:tableId,toCol:colId};
+        SP.fkLinks.push(fk);
+        const ft=SP.tables.find(t=>t.id===SP.fkConnecting.tableId),fc=ft?.columns.find(c=>c.id===SP.fkConnecting.colId);
+        if(fc&&!fc.fk)fc.fk=true;
+        const prevT=SP.fkConnecting;
+        SP.fkConnecting=null;
+        pmRefreshTable(prevT.tableId); pmRefreshTable(tableId);
+        pmRenderFk(fk); pmSnapshot(); pmScheduleSave(); pmClearHint();
+      }
+      return;
+    }
+    const prevTbl=SP.selectedTableId;
+    SP.selectedTableId=tableId; SP.selectedColId={tableId,colId};
+    if(prevTbl&&prevTbl!==tableId)pmRefreshTable(prevTbl);
+    pmRefreshTable(tableId); pmHideTbar(); pmShowCbar(tableId,colId);
+    return;
+  }
+  const dragZ=e.target.dataset.pmDragZone?e.target:null;
+  if(dragZ){
+    const tblId=dragZ.dataset.tableId,tbl=SP.tables.find(t=>t.id===tblId); if(!tbl) return;
+    const prevTbl=SP.selectedTableId;
+    SP.selectedTableId=tblId; SP.selectedColId=null;
+    if(prevTbl&&prevTbl!==tblId)pmRefreshTable(prevTbl);
+    pmRefreshTable(tblId); pmHideCbar(); pmShowTbar(tblId);
+    const pt=pmToSVG(e.clientX,e.clientY);
+    pmDragging={tbl,offX:pt.x-tbl.x,offY:pt.y-tbl.y}; pmDidDrag=false;
+    return;
+  }
+  if(SP.placingTable){
+    const pt=pmToSVG(e.clientX,e.clientY);
+    pmPlaceTable(pt.x,pt.y); return;
+  }
+  const prevTbl=SP.selectedTableId;
+  SP.selectedTableId=null; SP.selectedColId=null;
+  if(prevTbl)pmRefreshTable(prevTbl);
+  pmHideTbar(); pmHideCbar();
+  pmPanning=true; pmPanStart={x:e.clientX-SP.pan.x,y:e.clientY-SP.pan.y};
+  $pmSvg.style.cursor='grabbing';
+});
+
+$pmSvg.addEventListener('dblclick', e => {
+  const dragZ=e.target.dataset.pmDragZone?e.target:null;
+  if(dragZ) pmOpenNameEdit(dragZ.dataset.tableId);
+  const colEl=e.target.dataset.colId&&e.target.dataset.tableId?e.target:null;
+  if(colEl) pmOpenColEdit(colEl.dataset.tableId,colEl.dataset.colId);
+});
+
+$pmSvg.addEventListener('mousemove', e => {
+  if(pmPanning){SP.pan.x=e.clientX-pmPanStart.x;SP.pan.y=e.clientY-pmPanStart.y;pmApplyTransform();return;}
+  if(!pmDragging) return;
+  pmDidDrag=true;
+  const pt=pmToSVG(e.clientX,e.clientY);
+  pmDragging.tbl.x=pt.x-pmDragging.offX; pmDragging.tbl.y=pt.y-pmDragging.offY;
+  pmRefreshTable(pmDragging.tbl.id);
+  if(SP.selectedTableId===pmDragging.tbl.id)pmShowTbar(pmDragging.tbl.id);
+  e.preventDefault();
+});
+
+function _pmMouseUp(){if(pmDragging&&pmDidDrag){pmSnapshot();pmScheduleSave();}pmDragging=null;pmDidDrag=false;if(pmPanning){pmPanning=false;$pmSvg.style.cursor='';}}
+$pmSvg.addEventListener('mouseup',_pmMouseUp);
+window.addEventListener('mouseup',_pmMouseUp);
+
+$pmSvg.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const f=e.deltaY<0?1.08:1/1.08;
+  SP.zoom=Math.max(0.1,Math.min(5,SP.zoom*f));
+  pmApplyTransform();
+},{passive:false});
+
+// ── Inline edit ───────────────────────────────────────────────────────────────
+function pmOpenNameEdit(tblId) {
+  const tbl=SP.tables.find(t=>t.id===tblId); if(!tbl) return;
+  const sc=pmToScreen(tbl.x,tbl.y);
+  const wr=$pmWrap.getBoundingClientRect();
+  $pmEdit.style.display='block';
+  $pmEdit.style.left=(sc.x-wr.left)+'px';
+  $pmEdit.style.top=(sc.y-wr.top)+'px';
+  $pmEdit.style.width=(PM_COL_W*SP.zoom)+'px';
+  $pmEdit.value=tbl.name; $pmEdit.dataset.editType='table'; $pmEdit.dataset.tableId=tblId;
+  $pmEdit.focus(); $pmEdit.select();
+}
+function pmOpenColEdit(tblId,colId) {
+  const tbl=SP.tables.find(t=>t.id===tblId); if(!tbl) return;
+  const ci=tbl.columns.findIndex(c=>c.id===colId); if(ci<0) return;
+  const sc=pmToScreen(tbl.x,tbl.y+PM_HDR_H+ci*PM_ROW_H);
+  const wr=$pmWrap.getBoundingClientRect();
+  $pmEdit.style.display='block';
+  $pmEdit.style.left=(sc.x-wr.left)+'px';
+  $pmEdit.style.top=(sc.y-wr.top)+'px';
+  $pmEdit.style.width=(PM_COL_W*SP.zoom)+'px';
+  $pmEdit.value=tbl.columns[ci].name; $pmEdit.dataset.editType='col'; $pmEdit.dataset.tableId=tblId; $pmEdit.dataset.colId=colId;
+  $pmEdit.focus(); $pmEdit.select();
+}
+function pmCommitEdit() {
+  const type=$pmEdit.dataset.editType; if(!type) return;
+  if(type==='table'){const tbl=SP.tables.find(t=>t.id===$pmEdit.dataset.tableId);if(tbl){tbl.name=$pmEdit.value.trim()||tbl.name;pmRefreshTable(tbl.id);pmShowTbar(tbl.id);}}
+  else if(type==='col'){const tbl=SP.tables.find(t=>t.id===$pmEdit.dataset.tableId);const col=tbl?.columns.find(c=>c.id===$pmEdit.dataset.colId);if(col){col.name=$pmEdit.value.trim()||col.name;pmRefreshTable(tbl.id);pmShowCbar(tbl.id,col.id);}}
+  $pmEdit.style.display='none'; $pmEdit.dataset.editType='';
+  pmSnapshot(); pmScheduleSave();
+}
+$pmEdit.addEventListener('blur',()=>setTimeout(pmCommitEdit,80));
+$pmEdit.addEventListener('keydown',e=>{if(e.key==='Enter')pmCommitEdit();if(e.key==='Escape'){$pmEdit.style.display='none';$pmEdit.dataset.editType='';}});
+
+// ── Place table ───────────────────────────────────────────────────────────────
+function pmPlaceTable(x,y) {
+  const tbl={id:'pt'+(SP.nextId++),name:'新表格',x,y,columns:[{id:'pc'+(SP.nextId++),name:'id',type:'INT',pk:true,fk:false,nn:true}]};
+  SP.tables.push(tbl); pmRenderTable(tbl);
+  SP.placingTable=false;
+  document.getElementById('pm-add-table-btn').classList.remove('active');
+  $pmWrap.style.cursor='';
+  SP.selectedTableId=tbl.id; SP.selectedColId=null;
+  pmShowTbar(tbl.id);
+  pmSnapshot(); pmScheduleSave();
+}
+
+// ── Save ──────────────────────────────────────────────────────────────────────
+let pmSaveTimer=null;
+function pmScheduleSave() {
+  const name=document.getElementById('pm-diagram-name').value||'未命名實體模型';
+  document.getElementById('pm-save-status').textContent='儲存中…';
+  const now=Date.now();
+  try {
+    localStorage.setItem(diagKey(currentDiagramId),JSON.stringify({id:currentDiagramId,diagramType:'physical',name,tables:SP.tables,fkLinks:SP.fkLinks,nextId:SP.nextId,linkedLmDiagramId:SP.linkedLmDiagramId||null,updatedAt:now}));
+    const list=loadListCache()||[];
+    const idx=list.findIndex(x=>x.id===currentDiagramId);
+    const entry={id:currentDiagramId,name,updatedAt:now,nodeCount:SP.tables.length,diagramType:'physical'};
+    if(idx>=0)list[idx]=entry;else list.unshift(entry);
+    list.sort((a,b)=>b.updatedAt-a.updatedAt);
+    localStorage.setItem(listKey(),JSON.stringify(list));
+  }catch(e){}
+  clearTimeout(pmSaveTimer);
+  pmSaveTimer=setTimeout(async()=>{
+    try{await setDoc(doc(db,'users',currentUser.uid,'diagrams',currentDiagramId),{diagramType:'physical',name,tables:SP.tables,fkLinks:SP.fkLinks,nextId:SP.nextId,linkedLmDiagramId:SP.linkedLmDiagramId||null,updatedAt:serverTimestamp()});document.getElementById('pm-save-status').textContent='已儲存';}catch(e){document.getElementById('pm-save-status').textContent='儲存失敗';}
+  },2000);
+}
+document.getElementById('pm-diagram-name').addEventListener('input',pmScheduleSave);
+
+// ── Toolbar actions ───────────────────────────────────────────────────────────
+document.getElementById('pm-add-table-btn').addEventListener('click',()=>{
+  SP.placingTable=true; $pmWrap.style.cursor='crosshair';
+  pmSetHint('點擊畫布放置表格');
+});
+document.getElementById('pm-btn-fit').addEventListener('click',()=>{
+  if(!SP.tables.length) return;
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  SP.tables.forEach(t=>{x0=Math.min(x0,t.x);y0=Math.min(y0,t.y);x1=Math.max(x1,t.x+PM_COL_W);y1=Math.max(y1,t.y+PM_HDR_H+t.columns.length*PM_ROW_H);});
+  const W=$pmSvg.clientWidth,H=$pmSvg.clientHeight,pad=80;
+  SP.zoom=Math.min(5,Math.min((W-pad*2)/(x1-x0||1),(H-pad*2)/(y1-y0||1)));
+  SP.pan.x=(W-(x0+x1)*SP.zoom)/2; SP.pan.y=(H-(y0+y1)*SP.zoom)/2;
+  pmApplyTransform();
+});
+document.getElementById('pm-btn-undo').addEventListener('click',pmUndo);
+document.getElementById('pm-btn-redo').addEventListener('click',pmRedo);
+
+document.getElementById('pm-tb-add-col').addEventListener('click',e=>{
+  e.stopPropagation(); if(!SP.selectedTableId) return;
+  const tbl=SP.tables.find(t=>t.id===SP.selectedTableId); if(!tbl) return;
+  const newCol={id:'pc'+(SP.nextId++),name:'欄位',type:'VARCHAR(255)',pk:false,fk:false,nn:false};
+  tbl.columns.push(newCol); pmRefreshTable(tbl.id);
+  SP.selectedColId={tableId:tbl.id,colId:newCol.id};
+  pmHideTbar(); pmShowCbar(tbl.id,newCol.id); pmOpenColEdit(tbl.id,newCol.id);
+  pmSnapshot(); pmScheduleSave();
+});
+document.getElementById('pm-tb-fk-connect').addEventListener('click',e=>{
+  e.stopPropagation(); SP.fkConnecting={}; pmHideTbar(); pmHideCbar();
+  pmSetHint('點擊來源欄位，再點目標欄位，建立 FK 連線 · Esc 取消');
+});
+document.getElementById('pm-tb-rename').addEventListener('click',e=>{
+  e.stopPropagation(); if(!SP.selectedTableId) return; pmOpenNameEdit(SP.selectedTableId);
+});
+document.getElementById('pm-tb-del-table').addEventListener('click',e=>{
+  e.stopPropagation(); if(!SP.selectedTableId) return;
+  const tblId=SP.selectedTableId;
+  SP.tables=SP.tables.filter(t=>t.id!==tblId);
+  SP.fkLinks=SP.fkLinks.filter(fk=>{if(fk.fromTable===tblId||fk.toTable===tblId){pmFkEls.get(fk.id)?.remove();pmFkEls.delete(fk.id);return false;}return true;});
+  pmTEls.get(tblId)?.remove(); pmTEls.delete(tblId);
+  SP.selectedTableId=null; SP.selectedColId=null; pmHideTbar(); pmHideCbar();
+  pmSnapshot(); pmScheduleSave();
+});
+document.getElementById('pm-col-pk').addEventListener('click',e=>{
+  e.stopPropagation(); const sc=SP.selectedColId; if(!sc) return;
+  const tbl=SP.tables.find(t=>t.id===sc.tableId); const col=tbl?.columns.find(c=>c.id===sc.colId); if(!col) return;
+  col.pk=!col.pk; pmRefreshTable(tbl.id); pmShowCbar(sc.tableId,sc.colId); pmSnapshot(); pmScheduleSave();
+});
+document.getElementById('pm-col-fk-tog').addEventListener('click',e=>{
+  e.stopPropagation(); const sc=SP.selectedColId; if(!sc) return;
+  const tbl=SP.tables.find(t=>t.id===sc.tableId); const col=tbl?.columns.find(c=>c.id===sc.colId); if(!col) return;
+  col.fk=!col.fk; pmRefreshTable(tbl.id); pmShowCbar(sc.tableId,sc.colId); pmSnapshot(); pmScheduleSave();
+});
+document.getElementById('pm-col-nn').addEventListener('click',e=>{
+  e.stopPropagation(); const sc=SP.selectedColId; if(!sc) return;
+  const tbl=SP.tables.find(t=>t.id===sc.tableId); const col=tbl?.columns.find(c=>c.id===sc.colId); if(!col) return;
+  col.nn=!col.nn; pmRefreshTable(tbl.id); pmShowCbar(sc.tableId,sc.colId); pmSnapshot(); pmScheduleSave();
+});
+document.getElementById('pm-col-type').addEventListener('change',e=>{
+  e.stopPropagation(); const sc=SP.selectedColId; if(!sc) return;
+  const tbl=SP.tables.find(t=>t.id===sc.tableId); const col=tbl?.columns.find(c=>c.id===sc.colId); if(!col) return;
+  col.type=e.target.value; pmRefreshTable(tbl.id); pmShowCbar(sc.tableId,sc.colId); pmSnapshot(); pmScheduleSave();
+});
+document.getElementById('pm-col-fk-connect').addEventListener('click',e=>{
+  e.stopPropagation(); const sc=SP.selectedColId; if(!sc) return;
+  SP.fkConnecting={tableId:sc.tableId,colId:sc.colId}; pmHideCbar(); pmHideTbar();
+  pmSetHint('再點目標表格的欄位完成 FK 連線 · Esc 取消');
+});
+document.getElementById('pm-col-ins-before').addEventListener('click',e=>{
+  e.stopPropagation(); const sc=SP.selectedColId; if(!sc) return;
+  const tbl=SP.tables.find(t=>t.id===sc.tableId); if(!tbl) return;
+  const ci=tbl.columns.findIndex(c=>c.id===sc.colId); if(ci<0) return;
+  tbl.columns.splice(ci,0,{id:'pc'+(SP.nextId++),name:'欄位',type:'VARCHAR(255)',pk:false,fk:false,nn:false});
+  pmRefreshTable(tbl.id); pmShowCbar(sc.tableId,sc.colId); pmSnapshot(); pmScheduleSave();
+});
+document.getElementById('pm-col-ins-after').addEventListener('click',e=>{
+  e.stopPropagation(); const sc=SP.selectedColId; if(!sc) return;
+  const tbl=SP.tables.find(t=>t.id===sc.tableId); if(!tbl) return;
+  const ci=tbl.columns.findIndex(c=>c.id===sc.colId); if(ci<0) return;
+  tbl.columns.splice(ci+1,0,{id:'pc'+(SP.nextId++),name:'欄位',type:'VARCHAR(255)',pk:false,fk:false,nn:false});
+  pmRefreshTable(tbl.id); pmShowCbar(sc.tableId,sc.colId); pmSnapshot(); pmScheduleSave();
+});
+document.getElementById('pm-col-rename').addEventListener('click',e=>{
+  e.stopPropagation(); const sc=SP.selectedColId; if(!sc) return; pmOpenColEdit(sc.tableId,sc.colId);
+});
+document.getElementById('pm-col-del').addEventListener('click',e=>{
+  e.stopPropagation(); const sc=SP.selectedColId; if(!sc) return;
+  const tbl=SP.tables.find(t=>t.id===sc.tableId); if(!tbl) return;
+  if(tbl.columns.length<=1){alert('表格至少需要一個欄位');return;}
+  tbl.columns=tbl.columns.filter(c=>c.id!==sc.colId);
+  SP.fkLinks=SP.fkLinks.filter(fk=>{if((fk.fromTable===sc.tableId&&fk.fromCol===sc.colId)||(fk.toTable===sc.tableId&&fk.toCol===sc.colId)){pmFkEls.get(fk.id)?.remove();pmFkEls.delete(fk.id);return false;}return true;});
+  SP.selectedColId=null; pmRefreshTable(tbl.id); pmHideCbar(); pmSnapshot(); pmScheduleSave();
+});
+
+// ── Keyboard ──────────────────────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  if(document.getElementById('scr-physical').style.display==='none') return;
+  if(['pm-diagram-name','pm-inline-edit'].includes(e.target.id)||e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return;
+  if(e.key==='Escape'){SP.placingTable=false;SP.fkConnecting=null;$pmWrap.style.cursor='';pmClearHint();if(SP.selectedTableId)pmRefreshTable(SP.selectedTableId);return;}
+  if((e.key==='Backspace'||e.key==='Delete')&&SP.selectedTableId&&!SP.selectedColId){
+    const tblId=SP.selectedTableId;
+    SP.tables=SP.tables.filter(t=>t.id!==tblId);
+    SP.fkLinks=SP.fkLinks.filter(fk=>{if(fk.fromTable===tblId||fk.toTable===tblId){pmFkEls.get(fk.id)?.remove();pmFkEls.delete(fk.id);return false;}return true;});
+    pmTEls.get(tblId)?.remove();pmTEls.delete(tblId);SP.selectedTableId=null;pmHideTbar();pmHideCbar();pmSnapshot();pmScheduleSave();return;
+  }
+  if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();pmUndo();return;}
+  if((e.ctrlKey||e.metaKey)&&(e.key==='y'||(e.shiftKey&&e.key==='z'))){e.preventDefault();pmRedo();return;}
+  if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();pmScheduleSave();return;}
+});
+
+// ── Link logical model modal ──────────────────────────────────────────────────
+document.getElementById('pm-btn-link-lm').addEventListener('click',()=>{
+  const modal=document.getElementById('pm-link-modal');
+  modal.style.display='flex';
+  const list=document.getElementById('pm-link-list');
+  list.innerHTML='';
+  document.getElementById('pm-bind-status').textContent=SP.linkedLmDiagramId?'已連結邏輯模型':'未連結';
+  const allDiags=loadListCache()||[];
+  const lmDiags=allDiags.filter(d=>{ const c=loadDiagCache(d.id); return c?.diagramType==='logical'; });
+  if(!lmDiags.length){list.innerHTML='<p style="font-size:12px;color:#9ca3af;text-align:center;padding:16px;">尚無邏輯模型</p>';return;}
+  lmDiags.forEach(d=>{
+    const btn=document.createElement('button');
+    btn.style.cssText='display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;border-radius:8px;border:1px solid #e5e7eb;background:white;cursor:pointer;font-size:12px;text-align:left;transition:background .15s;';
+    btn.innerHTML=`<span style="font-size:9px;background:#f3e8ff;color:#7c3aed;border:1px solid #e9d5ff;border-radius:4px;padding:1px 5px;font-weight:700;flex-shrink:0;">邏輯</span><span style="flex:1;">${d.name||'未命名邏輯模型'}</span>`;
+    if(d.id===SP.linkedLmDiagramId) btn.style.background='#F0FDF4';
+    btn.onmouseenter=()=>btn.style.background='#F5F3FF';
+    btn.onmouseleave=()=>btn.style.background=d.id===SP.linkedLmDiagramId?'#F0FDF4':'white';
+    btn.addEventListener('click',()=>{
+      SP.linkedLmDiagramId=d.id;
+      document.getElementById('pm-btn-import').style.display='inline-flex';
+      document.getElementById('pm-bind-status').textContent=`已連結「${d.name}」`;
+      pmScheduleSave();
+      setTimeout(()=>{modal.style.display='none';},900);
+    });
+    list.appendChild(btn);
+  });
+});
+document.getElementById('pm-link-modal-close').addEventListener('click',()=>{ document.getElementById('pm-link-modal').style.display='none'; });
+document.getElementById('pm-bind-unlink').addEventListener('click',()=>{
+  SP.linkedLmDiagramId=null;
+  document.getElementById('pm-btn-import').style.display='none';
+  document.getElementById('pm-bind-status').textContent='已解除連結';
+  pmScheduleSave();
+  setTimeout(()=>{ document.getElementById('pm-link-modal').style.display='none'; },900);
+});
+document.getElementById('pm-link-modal').addEventListener('click',e=>{if(e.target===document.getElementById('pm-link-modal'))document.getElementById('pm-link-modal').style.display='none';});
+
+// ── Import from logical model ─────────────────────────────────────────────────
+document.getElementById('pm-btn-import').addEventListener('click',async()=>{
+  if(!SP.linkedLmDiagramId){alert('請先連結邏輯模型');return;}
+  if(!confirm('從連結的邏輯模型產生表格（現有表格保留，新增不重複的）。繼續？'))return;
+  try {
+    const snap=await getDoc(doc(db,'users',currentUser.uid,'diagrams',SP.linkedLmDiagramId));
+    const lmData=(snap.exists()?snap.data():null)||loadDiagCache(SP.linkedLmDiagramId);
+    if(!lmData||lmData.diagramType!=='logical'){alert('找不到連結的邏輯模型');return;}
+    const newTbls=[];
+    (lmData.tables||[]).forEach(lt=>{
+      if(SP.tables.find(t=>t.name===lt.name))return;
+      const columns=lt.columns.map(lc=>({id:'pc'+(SP.nextId++),name:lc.name,type:'VARCHAR(255)',pk:lc.pk||false,fk:lc.fk||false,nn:lc.pk||false}));
+      newTbls.push({id:'pt'+(SP.nextId++),name:lt.name,x:0,y:0,columns});
+    });
+    // Layout
+    let cx=80,cy=80;const MAX_W=900,GAP_X=60,GAP_Y=60;
+    newTbls.forEach(tbl=>{
+      const h=PM_HDR_H+tbl.columns.length*PM_ROW_H;
+      if(cx>80&&cx+PM_COL_W>MAX_W){cx=80;cy+=h+GAP_Y;}
+      tbl.x=cx;tbl.y=cy;cx+=PM_COL_W+GAP_X;
+    });
+    newTbls.forEach(tbl=>{SP.tables.push(tbl);pmRenderTable(tbl);});
+    pmSnapshot();pmScheduleSave();
+    alert(`已新增 ${newTbls.length} 張表格`);
+  }catch(e){alert('匯入失敗：'+e.message);}
+});
+
+// ── SQL DDL Export ────────────────────────────────────────────────────────────
+function pmGenerateSQL(dialect) {
+  if (!SP.tables.length) return '-- 尚無任何表格';
+  const lines = [];
+  const q = dialect === 'mssql' ? s => `[${s}]`
+           : dialect === 'postgresql' ? s => `"${s}"`
+           : s => `\`${s}\``;  // mysql / sqlite
+
+  // Helper: normalize type per dialect
+  function adaptType(t, pk, dialect) {
+    const tu = (t || 'VARCHAR(255)').toUpperCase();
+    if (dialect === 'postgresql') {
+      if (pk && (tu === 'INT' || tu === 'INTEGER')) return 'SERIAL';
+      if (pk && tu === 'BIGINT') return 'BIGSERIAL';
+      return t;
+    }
+    if (dialect === 'sqlite') {
+      if (tu.startsWith('VARCHAR')) return 'TEXT';
+      if (tu === 'BOOLEAN') return 'INTEGER';
+      if (tu === 'DATETIME' || tu === 'TIMESTAMP') return 'TEXT';
+      return t;
+    }
+    if (dialect === 'mssql') {
+      if (tu === 'INT' && pk) return 'INT IDENTITY(1,1)';
+      if (tu === 'BIGINT' && pk) return 'BIGINT IDENTITY(1,1)';
+      if (tu === 'BOOLEAN') return 'BIT';
+      if (tu.startsWith('VARCHAR')) return t.replace('VARCHAR','NVARCHAR');
+      if (tu === 'TEXT') return 'NTEXT';
+      return t;
+    }
+    // mysql: add AUTO_INCREMENT via PK constraint
+    return t;
+  }
+
+  // Build FK map: toTable -> list of FK objects
+  const fkMap = {};
+  SP.fkLinks.forEach(fk => {
+    if (!fkMap[fk.fromTable]) fkMap[fk.fromTable] = [];
+    fkMap[fk.fromTable].push(fk);
+  });
+
+  // Generate CREATE TABLE per table
+  SP.tables.forEach((tbl, ti) => {
+    if (ti > 0) lines.push('');
+    lines.push(`-- Table: ${tbl.name}`);
+    const createKw = dialect === 'mssql' ? 'CREATE TABLE' : 'CREATE TABLE IF NOT EXISTS';
+    lines.push(`${createKw} ${q(tbl.name)} (`);
+    const colDefs = [];
+    const pkCols = tbl.columns.filter(c => c.pk);
+
+    tbl.columns.forEach(col => {
+      let typePart = adaptType(col.type || 'VARCHAR(255)', col.pk, dialect);
+      const nnPart = col.nn || col.pk ? ' NOT NULL' : '';
+      const autoInc = col.pk && (dialect === 'mysql') && ((col.type||'').toUpperCase() === 'INT' || (col.type||'').toUpperCase() === 'BIGINT') ? ' AUTO_INCREMENT' : '';
+      colDefs.push(`  ${q(col.name)} ${typePart}${autoInc}${nnPart}`);
+    });
+
+    if (pkCols.length) {
+      const pkList = pkCols.map(c => q(c.name)).join(', ');
+      colDefs.push(`  PRIMARY KEY (${pkList})`);
+    }
+
+    // FK constraints
+    (fkMap[tbl.id] || []).forEach(fk => {
+      const toTbl = SP.tables.find(t => t.id === fk.toTable);
+      const fromCol = tbl.columns.find(c => c.id === fk.fromCol);
+      const toCol = toTbl?.columns.find(c => c.id === fk.toCol);
+      if (!toTbl || !fromCol || !toCol) return;
+      const fkName = `fk_${tbl.name}_${fromCol.name}`;
+      colDefs.push(`  CONSTRAINT ${q(fkName)} FOREIGN KEY (${q(fromCol.name)}) REFERENCES ${q(toTbl.name)} (${q(toCol.name)})`);
+    });
+
+    lines.push(colDefs.join(',\n'));
+    lines.push(');');
+  });
+
+  return lines.join('\n');
+}
+
+function pmOpenSQLModal() {
+  const modal = document.getElementById('pm-sql-modal');
+  const out = document.getElementById('pm-sql-output');
+  const dialect = document.getElementById('pm-sql-dialect').value;
+  out.textContent = pmGenerateSQL(dialect);
+  modal.style.display = 'flex';
+  document.getElementById('pm-sql-copy-msg').textContent = '';
+}
+
+document.getElementById('pm-btn-export-sql').addEventListener('click', pmOpenSQLModal);
+document.getElementById('pm-sql-dialect').addEventListener('change', () => {
+  document.getElementById('pm-sql-output').textContent = pmGenerateSQL(document.getElementById('pm-sql-dialect').value);
+});
+document.getElementById('pm-sql-modal-close').addEventListener('click', () => { document.getElementById('pm-sql-modal').style.display='none'; });
+document.getElementById('pm-sql-modal').addEventListener('click', e => { if(e.target===document.getElementById('pm-sql-modal')) document.getElementById('pm-sql-modal').style.display='none'; });
+document.getElementById('pm-sql-copy').addEventListener('click', () => {
+  const text = document.getElementById('pm-sql-output').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const msg = document.getElementById('pm-sql-copy-msg');
+    msg.textContent = '✓ 已複製到剪貼簿';
+    setTimeout(() => { msg.textContent=''; }, 2000);
+  }).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    document.getElementById('pm-sql-copy-msg').textContent = '✓ 已複製';
+    setTimeout(() => { document.getElementById('pm-sql-copy-msg').textContent=''; }, 2000);
+  });
+});
+document.getElementById('pm-sql-download').addEventListener('click', () => {
+  const dialect = document.getElementById('pm-sql-dialect').value;
+  const text = document.getElementById('pm-sql-output').textContent;
+  const name = (document.getElementById('pm-diagram-name').value || '未命名實體模型').replace(/[^a-zA-Z0-9\u4e00-\u9fff_-]/g,'_');
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=`${name}_${dialect}.sql`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+// ── Open physical diagram ─────────────────────────────────────────────────────
+function openPhysicalDiagram(id, data) {
+  stopAllListeners();
+  currentDiagramId=id;
+  const cached=loadDiagCache(id);
+  const src=(cached?.diagramType==='physical'?cached:null)||data;
+  SP.tables=src.tables||[];SP.fkLinks=src.fkLinks||[];SP.nextId=src.nextId||1;
+  SP.linkedLmDiagramId=src.linkedLmDiagramId||null;
+  SP.selectedTableId=null;SP.selectedColId=null;SP.fkConnecting=null;SP.placingTable=false;
+  SP.pan={x:100,y:80};SP.zoom=1;
+  document.getElementById('pm-diagram-name').value=src.name||'未命名實體模型';
+  document.getElementById('pm-btn-import').style.display=SP.linkedLmDiagramId?'inline-flex':'none';
+  if(currentUser?.photoURL){const av=document.getElementById('pm-user-avatar');av.src=currentUser.photoURL;av.style.display='block';}
+  show('physical');pmRenderAll();pmApplyTransform();
+  HP.stack=[];HP.idx=-1;pmSnapshot();pmSyncUR();
+}
+
+// ── Back to Home ──────────────────────────────────────────────────────────────
+document.getElementById('pm-btn-back-home').addEventListener('click',()=>{
+  stopAllListeners();clearTimeout(pmSaveTimer);
+  const name=document.getElementById('pm-diagram-name').value,now=Date.now();
+  try{localStorage.setItem(diagKey(currentDiagramId),JSON.stringify({id:currentDiagramId,diagramType:'physical',name,tables:SP.tables,fkLinks:SP.fkLinks,nextId:SP.nextId,linkedLmDiagramId:SP.linkedLmDiagramId||null,updatedAt:now}));
+    const list=loadListCache()||[];const idx=list.findIndex(x=>x.id===currentDiagramId);
+    const entry={id:currentDiagramId,name,updatedAt:now,nodeCount:SP.tables.length,diagramType:'physical'};
+    if(idx>=0)list[idx]=entry;else list.unshift(entry);
+    list.sort((a,b)=>b.updatedAt-a.updatedAt);localStorage.setItem(listKey(),JSON.stringify(list));
+  }catch(e){}
+  show('home');loadHomeFast();loadHome();
+});
+document.getElementById('pm-btn-logout').addEventListener('click',()=>signOut(auth).then(()=>show('login')));
+
+// ── Bug report modal ──────────────────────────────────────────────────────────
+document.getElementById('btn-report-bug').addEventListener('click', () => {
+  document.getElementById('bug-modal').style.display = 'flex';
+  document.getElementById('bug-desc').value = '';
+  document.getElementById('bug-img-preview').style.display = 'none';
+  document.getElementById('bug-img-input').value = '';
+  document.getElementById('bug-img-name').textContent = '點擊選擇圖片';
+  document.getElementById('bug-status').textContent = '';
+});
+document.getElementById('bug-modal-close').addEventListener('click', () => { document.getElementById('bug-modal').style.display='none'; });
+document.getElementById('bug-cancel').addEventListener('click', () => { document.getElementById('bug-modal').style.display='none'; });
+document.getElementById('bug-modal').addEventListener('click', e => { if(e.target===document.getElementById('bug-modal')) document.getElementById('bug-modal').style.display='none'; });
+document.getElementById('bug-img-input').addEventListener('change', e => {
+  const f = e.target.files[0]; if(!f) return;
+  document.getElementById('bug-img-name').textContent = f.name;
+  const preview = document.getElementById('bug-img-preview');
+  const reader = new FileReader();
+  reader.onload = ev => { preview.src=ev.target.result; preview.style.display='block'; };
+  reader.readAsDataURL(f);
+});
+document.getElementById('bug-submit').addEventListener('click', async () => {
+  const desc = document.getElementById('bug-desc').value.trim();
+  if (!desc) { document.getElementById('bug-status').textContent='請先描述問題'; document.getElementById('bug-status').style.color='#DC2626'; return; }
+  const btn = document.getElementById('bug-submit');
+  btn.disabled = true; btn.textContent = '送出中…';
+  document.getElementById('bug-status').textContent = '';
+  // Auto-generate subject from first 60 chars
+  const subject = encodeURIComponent('[ERCanvas 回報] ' + desc.slice(0,60) + (desc.length>60?'…':''));
+  const userLine = currentUser ? `使用者：${currentUser.displayName||''} (${currentUser.email||''})` : '未登入使用者';
+  const body = encodeURIComponent(`${userLine}\n\n${desc}\n\n---\n回報時間：${new Date().toLocaleString('zh-TW')}`);
+  // Try FormSubmit first; fallback to mailto
+  const imgFile = document.getElementById('bug-img-input').files[0];
+  try {
+    if (imgFile) {
+      const fd = new FormData();
+      fd.append('_subject', decodeURIComponent(subject));
+      fd.append('_template', 'table');
+      fd.append('描述', desc);
+      fd.append('使用者', currentUser?.displayName||'未登入');
+      fd.append('Email', currentUser?.email||'N/A');
+      fd.append('時間', new Date().toLocaleString('zh-TW'));
+      fd.append('attachment', imgFile);
+      const res = await fetch('https://formsubmit.co/ajax/p.hsiang0216@gmail.com', { method:'POST', body:fd });
+      const json = await res.json();
+      if (json.success==='true'||json.success===true) {
+        document.getElementById('bug-status').textContent='✓ 已成功送出，感謝你的回報！';
+        document.getElementById('bug-status').style.color='#059669';
+        setTimeout(()=>{ document.getElementById('bug-modal').style.display='none'; btn.disabled=false; btn.textContent='送出回報'; },1800);
+        return;
+      }
+    } else {
+      const res = await fetch('https://formsubmit.co/ajax/p.hsiang0216@gmail.com', {
+        method:'POST', headers:{'Content-Type':'application/json','Accept':'application/json'},
+        body: JSON.stringify({ _subject: decodeURIComponent(subject), 描述:desc, 使用者:currentUser?.displayName||'未登入', Email:currentUser?.email||'N/A', 時間:new Date().toLocaleString('zh-TW') })
+      });
+      const json = await res.json();
+      if (json.success==='true'||json.success===true) {
+        document.getElementById('bug-status').textContent='✓ 已成功送出，感謝你的回報！';
+        document.getElementById('bug-status').style.color='#059669';
+        setTimeout(()=>{ document.getElementById('bug-modal').style.display='none'; btn.disabled=false; btn.textContent='送出回報'; },1800);
+        return;
+      }
+    }
+  } catch(e2) { /* fallback to mailto */ }
+  // Fallback: open mailto
+  window.location.href = `mailto:p.hsiang0216@gmail.com?subject=${subject}&body=${body}`;
+  document.getElementById('bug-status').textContent='已開啟郵件客戶端（若有圖片請手動附加）';
+  document.getElementById('bug-status').style.color='#2563EB';
+  btn.disabled=false; btn.textContent='送出回報';
 });
 
 lmApplyTransform();
