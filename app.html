@@ -1143,7 +1143,18 @@ function startDiagListener(diagId, ownerUid) {
     if (!snap.exists()) return;
     const d = snap.val();
     if (!d || d.updatedBy === currentUser.uid) return; // skip own writes
-    S.nodes  = d.nodes  || [];
+    // If we're mid-drag, preserve local position for the dragged nodes
+    // so remote updates can't yank them out from under the user's cursor
+    const _draggingIds = dragging ? new Set(dragging.nodes.map(({node})=>node.id)) : new Set();
+    if (_draggingIds.size > 0) {
+      S.nodes = (d.nodes||[]).map(n => {
+        if (!_draggingIds.has(n.id)) return n;
+        // Return the exact same object dragging[] references so positions stay in sync
+        return S.nodes.find(ln=>ln.id===n.id) || n;
+      });
+    } else {
+      S.nodes = d.nodes || [];
+    }
     S.edges  = d.edges  || [];
     S.nextId = d.nextId || S.nextId;
     S.selectedIds.clear(); S.selectedEdgeId = null;
@@ -3027,7 +3038,14 @@ function startLmDiagListener(diagId) {
     const d=snap.val();
     if(!d || d.updatedBy===currentUser.uid) return; // skip own writes
     if(d.diagramType!=='logical' || !Array.isArray(d.tables)) return;
-    SL.tables=d.tables||[]; SL.fkLinks=d.fkLinks||[];
+    // Preserve local object reference for a table currently being dragged
+    if(lmDragging?.tbl) {
+      const localTbl=lmDragging.tbl;
+      SL.tables=(d.tables||[]).map(t=>t.id===localTbl.id ? localTbl : t);
+    } else {
+      SL.tables=d.tables||[];
+    }
+    SL.fkLinks=d.fkLinks||[];
     SL.nextId=d.nextId||SL.nextId;
     SL.selectedTableId=null; SL.selectedColId=null;
     lmRenderAll();
