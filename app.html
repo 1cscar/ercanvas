@@ -212,8 +212,13 @@
         新增實體模型
       </button>
       <div class="flex-1"></div>
+      <button id="btn-tutorial"
+        class="flex items-center justify-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 border border-blue-200 bg-blue-50 rounded-lg px-3 py-2 hover:bg-blue-100 transition-colors mt-auto">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 1a7 7 0 1 1 0 14A7 7 0 0 1 8 1z" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="4.5" r="1" fill="currentColor"/></svg>
+        使用教學
+      </button>
       <button id="btn-report-bug"
-        class="flex items-center justify-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors mt-auto">
+        class="flex items-center justify-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors">
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v4M8 11v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         問題回報
       </button>
@@ -462,6 +467,343 @@
 
       <!-- Status hint -->
       <div id="status-hint" style="display:none; position:absolute; bottom:14px; left:50%; transform:translateX(-50%); background:#1f2937; color:white; font-size:11px; padding:5px 16px; border-radius:20px; pointer-events:none; white-space:nowrap;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Tutorial Modal -->
+<div id="tutorial-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1000;align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto;">
+  <div style="background:white;border-radius:18px;box-shadow:0 16px 60px rgba(0,0,0,0.22);width:780px;max-width:95vw;margin-bottom:40px;overflow:hidden;">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px 16px;border-bottom:1px solid #f1f5f9;">
+      <div>
+        <h2 style="font-size:16px;font-weight:800;color:#111827;margin:0 0 2px;">使用教學</h2>
+        <p style="font-size:11px;color:#9ca3af;margin:0;">ERCanvas 完整操作說明</p>
+      </div>
+      <button id="tutorial-modal-close" style="width:30px;height:30px;border-radius:50%;border:1px solid #e5e7eb;background:white;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#6b7280;">✕</button>
+    </div>
+    <!-- Tabs -->
+    <div style="display:flex;gap:4px;padding:12px 24px 0;border-bottom:1px solid #f1f5f9;">
+      <button class="tut-modal-tab active" data-panel="tm-er"   style="font-size:12px;font-weight:700;padding:6px 16px;border:none;border-radius:8px 8px 0 0;cursor:pointer;background:#EFF6FF;color:#2563EB;border-bottom:2px solid #2563EB;">ER 圖</button>
+      <button class="tut-modal-tab"        data-panel="tm-lm"   style="font-size:12px;font-weight:700;padding:6px 16px;border:none;border-radius:8px 8px 0 0;cursor:pointer;background:transparent;color:#6b7280;border-bottom:2px solid transparent;">邏輯模型</button>
+      <button class="tut-modal-tab"        data-panel="tm-pm"   style="font-size:12px;font-weight:700;padding:6px 16px;border:none;border-radius:8px 8px 0 0;cursor:pointer;background:transparent;color:#6b7280;border-bottom:2px solid transparent;">實體模型</button>
+      <button class="tut-modal-tab"        data-panel="tm-keys" style="font-size:12px;font-weight:700;padding:6px 16px;border:none;border-radius:8px 8px 0 0;cursor:pointer;background:transparent;color:#6b7280;border-bottom:2px solid transparent;">⌨ 快捷鍵</button>
+    </div>
+    <!-- Panels -->
+    <div style="padding:20px 24px 24px;max-height:70vh;overflow-y:auto;">
+
+      <!-- ER 圖 -->
+      <div id="tm-er" class="tut-modal-panel">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:24px;height:24px;background:#2563EB;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:800;flex-shrink:0;">1</div>
+              <strong style="font-size:13px;color:#111827;">放置節點</strong>
+            </div>
+            <p style="font-size:12px;color:#6b7280;line-height:1.7;margin-bottom:8px;">點左側工具列選元素類型 → 游標變成 ✛ → 點畫布放置。</p>
+            <div style="font-size:11px;color:#374151;background:white;border:1px solid #e5e7eb;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:4px;">
+              <div>▭ 實體 &nbsp;▭▭ 弱實體 &nbsp;◇ 關聯 &nbsp;◇◇ 弱關聯</div>
+              <div>◯ 屬性 &nbsp;◯◯ 多值屬性 &nbsp;⌀ 衍生屬性 &nbsp;⬜◇ 聚合</div>
+            </div>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:24px;height:24px;background:#2563EB;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:800;flex-shrink:0;">2</div>
+              <strong style="font-size:13px;color:#111827;">選取節點工具列</strong>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px;font-size:12px;">
+              <div style="display:flex;gap:6px;align-items:flex-start;"><span style="background:#EFF6FF;color:#2563EB;font-weight:700;padding:1px 8px;border-radius:5px;flex-shrink:0;font-size:10px;">連線</span><span style="color:#6b7280;">點另一節點完成；點同節點取消</span></div>
+              <div style="display:flex;gap:6px;align-items:flex-start;"><span style="background:#F0FDF4;color:#16A34A;font-weight:700;padding:1px 8px;border-radius:5px;flex-shrink:0;font-size:10px;">新增</span><span style="color:#6b7280;">選類型放置，自動連回原節點</span></div>
+              <div style="display:flex;gap:6px;align-items:flex-start;"><span style="background:#F5F3FF;color:#7C3AED;font-weight:700;padding:1px 8px;border-radius:5px;flex-shrink:0;font-size:10px;">複製</span><span style="color:#6b7280;">在附近複製相同節點</span></div>
+              <div style="display:flex;gap:6px;align-items:flex-start;"><span style="background:#FFFBEB;color:#92400E;font-weight:700;padding:1px 8px;border-radius:5px;flex-shrink:0;font-size:10px;">🔓鎖定</span><span style="color:#6b7280;">鎖定後不可拖動，再按解鎖</span></div>
+              <div style="display:flex;gap:6px;align-items:flex-start;"><span style="background:#FEF2F2;color:#DC2626;font-weight:700;padding:1px 8px;border-radius:5px;flex-shrink:0;font-size:10px;">刪除</span><span style="color:#6b7280;">刪除節點與所有連線</span></div>
+            </div>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:24px;height:24px;background:#2563EB;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:800;flex-shrink:0;">3</div>
+              <strong style="font-size:13px;color:#111827;">編輯文字 &amp; 樣式</strong>
+            </div>
+            <div style="font-size:12px;color:#6b7280;line-height:1.7;">
+              <div>• <strong>雙擊節點</strong>進入文字編輯</div>
+              <div>• 頂部工具列：字級 / 字型 / 粗體 / 斜體 / 顏色</div>
+              <div>• Enter 或點其他處確認，Esc 取消</div>
+            </div>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:24px;height:24px;background:#2563EB;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:800;flex-shrink:0;">4</div>
+              <strong style="font-size:13px;color:#111827;">基數標記</strong>
+            </div>
+            <div style="font-size:12px;color:#6b7280;line-height:1.7;">
+              <div>• <strong>右鍵點連線</strong> → 設定基數標記</div>
+              <div>• 標記顯示在連線兩端靠節點處</div>
+              <div>• 快速選：1:1 · 1:n · n:1 · m:n</div>
+              <div>• 或自行輸入任意文字</div>
+            </div>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:24px;height:24px;background:#2563EB;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:800;flex-shrink:0;">5</div>
+              <strong style="font-size:13px;color:#111827;">畫布操作</strong>
+            </div>
+            <div style="font-size:12px;color:#6b7280;line-height:1.7;">
+              <div>• <strong>縮放</strong>：滾輪 / 雙指</div>
+              <div>• <strong>平移</strong>：拖拉空白處</div>
+              <div>• <strong>全覽</strong>：頂部「全覽」按鈕</div>
+              <div>• <strong>鎖定節點</strong>：選取後點工具列鎖定</div>
+            </div>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:24px;height:24px;background:#2563EB;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:800;flex-shrink:0;">6</div>
+              <strong style="font-size:13px;color:#111827;">匯出與分享</strong>
+            </div>
+            <div style="font-size:12px;color:#6b7280;line-height:1.7;">
+              <div>• <strong>匯出 SVG</strong>：右上角按鈕</div>
+              <div>• <strong>分享</strong>：設定唯讀或可編輯連結</div>
+              <div>• <strong>即時協作</strong>：多人同時編輯，頭像顯示在線狀態</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 邏輯模型 -->
+      <div id="tm-lm" class="tut-modal-panel" style="display:none;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:24px;height:24px;background:#7C3AED;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:800;flex-shrink:0;">1</div>
+              <strong style="font-size:13px;color:#111827;">建立邏輯模型</strong>
+            </div>
+            <div style="font-size:12px;color:#6b7280;line-height:1.7;">
+              <div>• Home 點「新增邏輯模型」手動建立</div>
+              <div>• 或點「連結 ER 圖 → 從 ER 圖轉換」自動生成</div>
+              <div>• ER 實體 → 資料表，屬性 → 欄位</div>
+            </div>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:24px;height:24px;background:#7C3AED;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:800;flex-shrink:0;">2</div>
+              <strong style="font-size:13px;color:#111827;">表格操作</strong>
+            </div>
+            <div style="font-size:12px;color:#6b7280;line-height:1.7;">
+              <div>• <strong>新增</strong>：點左側「資料表」→ 點畫布放置</div>
+              <div>• <strong>改名</strong>：雙擊表格標題 或 工具列「改名」</div>
+              <div>• <strong>移動</strong>：拖拉表格標題列</div>
+              <div>• <strong>刪除</strong>：工具列「刪除」或 Delete 鍵</div>
+            </div>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:24px;height:24px;background:#7C3AED;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:800;flex-shrink:0;">3</div>
+              <strong style="font-size:13px;color:#111827;">欄位操作</strong>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;font-size:12px;">
+              <div style="display:flex;gap:6px;"><span style="background:#FFF7ED;color:#C2410C;font-weight:700;padding:1px 6px;border-radius:5px;font-size:10px;flex-shrink:0;">PK</span><span style="color:#6b7280;">設為主鍵</span></div>
+              <div style="display:flex;gap:6px;"><span style="background:#EFF6FF;color:#2563EB;font-weight:700;padding:1px 6px;border-radius:5px;font-size:10px;flex-shrink:0;">FK</span><span style="color:#6b7280;">標記外鍵</span></div>
+              <div style="display:flex;gap:6px;"><span style="background:#F0FDF4;color:#16A34A;font-weight:700;padding:1px 6px;border-radius:5px;font-size:10px;flex-shrink:0;">← →</span><span style="color:#6b7280;">前後插入新欄位</span></div>
+              <div style="display:flex;gap:6px;"><span style="background:#F5F3FF;color:#7C3AED;font-weight:700;padding:1px 6px;border-radius:5px;font-size:10px;flex-shrink:0;">連線</span><span style="color:#6b7280;">建立 FK 箭頭至另一表格</span></div>
+              <div style="display:flex;gap:6px;"><span style="background:white;color:#374151;font-weight:700;padding:1px 6px;border-radius:5px;border:1px solid #e5e7eb;font-size:10px;flex-shrink:0;">改名</span><span style="color:#6b7280;">雙擊欄位 或 點「改名」</span></div>
+              <div style="display:flex;gap:6px;"><span style="background:#FEF2F2;color:#DC2626;font-weight:700;padding:1px 6px;border-radius:5px;font-size:10px;flex-shrink:0;">刪除</span><span style="color:#6b7280;">至少保留一欄</span></div>
+            </div>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:24px;height:24px;background:#7C3AED;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:800;flex-shrink:0;">4</div>
+              <strong style="font-size:13px;color:#111827;">連結 ER 圖自動轉換</strong>
+            </div>
+            <div style="font-size:12px;color:#6b7280;line-height:1.7;">
+              <div>1. 右上角「連結 ER 圖」</div>
+              <div>2. 選取目標 ER 圖</div>
+              <div>3. 點「從 ER 圖轉換」</div>
+              <div>• 已存在同名表格不重複建立</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 實體模型 -->
+      <div id="tm-pm" class="tut-modal-panel" style="display:none;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:24px;height:24px;background:#059669;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:800;flex-shrink:0;">1</div>
+              <strong style="font-size:13px;color:#111827;">三欄式表格結構</strong>
+            </div>
+            <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;font-size:11px;">
+              <div style="display:grid;grid-template-columns:2fr 1.5fr 2fr;background:#f1f5f9;padding:5px 8px;font-weight:700;color:#64748B;">
+                <span>欄位名稱</span><span>型別</span><span>說明</span>
+              </div>
+              <div style="display:grid;grid-template-columns:2fr 1.5fr 2fr;padding:5px 8px;border-top:1px solid #f1f5f9;">
+                <span><span style="color:#C2410C;font-weight:700;font-size:9px;">PK</span> id</span>
+                <span style="font-family:monospace;color:#475569;">INT</span>
+                <span style="color:#64748B;">主鍵</span>
+              </div>
+              <div style="display:grid;grid-template-columns:2fr 1.5fr 2fr;padding:5px 8px;border-top:1px solid #f1f5f9;">
+                <span><span style="color:#2563EB;font-weight:700;font-size:9px;">FK</span> dept_id</span>
+                <span style="font-family:monospace;color:#475569;">INT</span>
+                <span style="color:#64748B;">外部鍵</span>
+              </div>
+              <div style="display:grid;grid-template-columns:2fr 1.5fr 2fr;padding:5px 8px;border-top:1px solid #f1f5f9;">
+                <span style="padding-left:14px;">name</span>
+                <span style="font-family:monospace;color:#475569;">VARCHAR</span>
+                <span style="color:#64748B;">建立索引</span>
+              </div>
+            </div>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:24px;height:24px;background:#059669;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:800;flex-shrink:0;">2</div>
+              <strong style="font-size:13px;color:#111827;">欄位屬性設定</strong>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;font-size:12px;">
+              <div style="display:flex;gap:6px;"><span style="background:#FFF7ED;color:#C2410C;font-weight:700;padding:1px 6px;border-radius:5px;font-size:10px;flex-shrink:0;">PK</span><span style="color:#6b7280;">主鍵（粗體，自動 NOT NULL）</span></div>
+              <div style="display:flex;gap:6px;"><span style="background:#EFF6FF;color:#2563EB;font-weight:700;padding:1px 6px;border-radius:5px;font-size:10px;flex-shrink:0;">FK</span><span style="color:#6b7280;">外鍵標記</span></div>
+              <div style="display:flex;gap:6px;"><span style="background:#F9FAFB;color:#374151;font-weight:700;padding:1px 6px;border-radius:5px;border:1px solid #e5e7eb;font-size:10px;flex-shrink:0;">NN</span><span style="color:#6b7280;">非空（欄位名底線）</span></div>
+              <div style="display:flex;gap:6px;"><span style="background:#F9FAFB;color:#374151;font-weight:700;padding:1px 6px;border-radius:5px;border:1px solid #e5e7eb;font-size:10px;flex-shrink:0;">型別</span><span style="color:#6b7280;">INT / VARCHAR / TEXT / DATE…</span></div>
+              <div style="display:flex;gap:6px;"><span style="background:#F9FAFB;color:#374151;font-weight:700;padding:1px 6px;border-radius:5px;border:1px solid #e5e7eb;font-size:10px;flex-shrink:0;">說明</span><span style="color:#6b7280;">主鍵、外部鍵、建立索引…</span></div>
+            </div>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:24px;height:24px;background:#059669;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:800;flex-shrink:0;">3</div>
+              <strong style="font-size:13px;color:#111827;">FK 連線</strong>
+            </div>
+            <div style="font-size:12px;color:#6b7280;line-height:1.7;">
+              <div>方式①：點表格 → 工具列「FK連線」→ 點來源欄位 → 點目標欄位</div>
+              <div style="margin-top:4px;">方式②：點欄位 → 工具列「連線」→ 點目標表格欄位</div>
+              <div style="margin-top:4px;color:#9ca3af;">• 點擊 FK 箭頭可刪除連線</div>
+              <div style="color:#9ca3af;">• Esc 取消連線操作</div>
+            </div>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <div style="width:24px;height:24px;background:#059669;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:800;flex-shrink:0;">4</div>
+              <strong style="font-size:13px;color:#111827;">匯出 SQL DDL</strong>
+            </div>
+            <div style="font-size:12px;color:#6b7280;line-height:1.7;">
+              <div>右上角「匯出 SQL DDL」→ 選方言：</div>
+              <div style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+                <div style="background:white;border:1px solid #e5e7eb;border-radius:6px;padding:5px 8px;"><div style="font-weight:700;color:#374151;font-size:11px;">MySQL</div><div style="color:#9ca3af;font-size:10px;">AUTO_INCREMENT</div></div>
+                <div style="background:white;border:1px solid #e5e7eb;border-radius:6px;padding:5px 8px;"><div style="font-weight:700;color:#374151;font-size:11px;">PostgreSQL</div><div style="color:#9ca3af;font-size:10px;">SERIAL / BIGSERIAL</div></div>
+                <div style="background:white;border:1px solid #e5e7eb;border-radius:6px;padding:5px 8px;"><div style="font-weight:700;color:#374151;font-size:11px;">SQLite</div><div style="color:#9ca3af;font-size:10px;">VARCHAR→TEXT</div></div>
+                <div style="background:white;border:1px solid #e5e7eb;border-radius:6px;padding:5px 8px;"><div style="font-weight:700;color:#374151;font-size:11px;">SQL Server</div><div style="color:#9ca3af;font-size:10px;">IDENTITY(1,1)</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 快捷鍵 -->
+      <div id="tm-keys" class="tut-modal-panel" style="display:none;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+            <div style="font-size:12px;font-weight:800;color:#2563EB;margin-bottom:12px;">ER 圖 &amp; 通用</div>
+            <div style="display:flex;flex-direction:column;gap:7px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">上一步（復原）</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">Ctrl/⌘ Z</kbd>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">下一步（重做）</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">Ctrl/⌘ Y</kbd>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">重做（替代）</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">⇧ Z</kbd>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">強制儲存</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">Ctrl/⌘ S</kbd>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">取消操作</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">Esc</kbd>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">刪除節點</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">Backspace</kbd>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">縮放畫布</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">滾輪</kbd>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">平移畫布</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">拖拉空白</kbd>
+              </div>
+            </div>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+            <div style="font-size:12px;font-weight:800;color:#7C3AED;margin-bottom:12px;">邏輯模型</div>
+            <div style="display:flex;flex-direction:column;gap:7px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">上一步</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">Ctrl/⌘ Z</kbd>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">下一步</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">Ctrl/⌘ Y</kbd>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">強制儲存</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">Ctrl/⌘ S</kbd>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">刪除表格</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">Delete</kbd>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">確認編輯</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">Enter</kbd>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">取消</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">Esc</kbd>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">縮放 / 平移</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">滾輪 / 拖拉</kbd>
+              </div>
+            </div>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+            <div style="font-size:12px;font-weight:800;color:#059669;margin-bottom:12px;">實體模型</div>
+            <div style="display:flex;flex-direction:column;gap:7px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">上一步</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">Ctrl/⌘ Z</kbd>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">下一步</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">Ctrl/⌘ Y</kbd>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">強制儲存</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">Ctrl/⌘ S</kbd>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">刪除表格</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">Backspace</kbd>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">確認編輯</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">Enter</kbd>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">取消放置/FK連線</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">Esc</kbd>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;">
+                <span style="color:#374151;">縮放 / 平移</span>
+                <kbd style="background:white;border:1px solid #d1d5db;border-radius:5px;padding:1px 7px;font-family:monospace;font-size:10px;box-shadow:0 1px 2px rgba(0,0,0,0.06);">滾輪 / 拖拉</kbd>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -4384,6 +4726,33 @@ document.getElementById('bug-submit').addEventListener('click', async () => {
   document.getElementById('bug-status').textContent='已開啟郵件客戶端（若有圖片請手動附加）';
   document.getElementById('bug-status').style.color='#2563EB';
   btn.disabled=false; btn.textContent='送出回報';
+});
+
+// ── Tutorial modal ────────────────────────────────────────────────────────────
+document.getElementById('btn-tutorial').addEventListener('click', () => {
+  const m = document.getElementById('tutorial-modal');
+  m.style.display = 'flex';
+  document.querySelectorAll('.tut-modal-panel').forEach(p => p.style.display = 'none');
+  document.getElementById('tm-er').style.display = '';
+  document.querySelectorAll('.tut-modal-tab').forEach(b => {
+    b.style.background = 'transparent'; b.style.color = '#6b7280'; b.style.borderBottom = '2px solid transparent';
+  });
+  const first = document.querySelector('.tut-modal-tab');
+  first.style.background = '#EFF6FF'; first.style.color = '#2563EB'; first.style.borderBottom = '2px solid #2563EB';
+});
+document.getElementById('tutorial-modal-close').addEventListener('click', () => { document.getElementById('tutorial-modal').style.display = 'none'; });
+document.getElementById('tutorial-modal').addEventListener('click', e => { if(e.target === document.getElementById('tutorial-modal')) document.getElementById('tutorial-modal').style.display = 'none'; });
+document.querySelectorAll('.tut-modal-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tut-modal-panel').forEach(p => p.style.display = 'none');
+    document.getElementById(btn.dataset.panel).style.display = '';
+    const colors = { 'tm-er': ['#EFF6FF','#2563EB'], 'tm-lm': ['#F5F3FF','#7C3AED'], 'tm-pm': ['#ECFDF5','#059669'], 'tm-keys': ['#F9FAFB','#374151'] };
+    document.querySelectorAll('.tut-modal-tab').forEach(b => {
+      b.style.background = 'transparent'; b.style.color = '#6b7280'; b.style.borderBottom = '2px solid transparent';
+    });
+    const [bg, fg] = colors[btn.dataset.panel] || ['#F9FAFB','#374151'];
+    btn.style.background = bg; btn.style.color = fg; btn.style.borderBottom = `2px solid ${fg}`;
+  });
 });
 
 lmApplyTransform();

@@ -158,6 +158,7 @@
     <nav class="hidden md:flex items-center gap-8 text-sm text-gray-600">
       <a href="#features" class="hover:text-primary transition-colors">功能特色</a>
       <a href="#howitworks" class="hover:text-primary transition-colors">使用方式</a>
+      <a href="#tutorial" class="hover:text-primary transition-colors">使用教學</a>
       <a href="#pricing" class="hover:text-primary transition-colors">方案定價</a>
     </nav>
     <div class="flex items-center gap-3">
@@ -588,6 +589,404 @@
     </div>
   </div>
 </section>
+
+<!-- ===== TUTORIAL ===== -->
+<section id="tutorial" class="py-20 bg-white">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-12">
+      <h2 class="text-3xl font-extrabold text-gray-900 mb-3">完整使用教學</h2>
+      <p class="text-gray-500 text-lg">從 ER 概念圖到可執行 SQL，三個階段全覆蓋</p>
+    </div>
+
+    <!-- Tab bar -->
+    <div class="flex gap-2 mb-8 bg-gray-100 p-1 rounded-xl w-fit mx-auto">
+      <button onclick="switchTab('er')"   id="tab-er"   class="tut-tab active px-5 py-2 rounded-lg text-sm font-semibold transition-all bg-white text-blue-600 shadow-sm">ER 圖</button>
+      <button onclick="switchTab('lm')"   id="tab-lm"   class="tut-tab        px-5 py-2 rounded-lg text-sm font-semibold transition-all text-gray-500 hover:text-gray-700">邏輯模型</button>
+      <button onclick="switchTab('pm')"   id="tab-pm"   class="tut-tab        px-5 py-2 rounded-lg text-sm font-semibold transition-all text-gray-500 hover:text-gray-700">實體模型</button>
+      <button onclick="switchTab('keys')" id="tab-keys" class="tut-tab        px-5 py-2 rounded-lg text-sm font-semibold transition-all text-gray-500 hover:text-gray-700">⌨ 快捷鍵</button>
+    </div>
+
+    <!-- ── ER 圖教學 ── -->
+    <div id="tut-er" class="tut-panel">
+      <div class="grid md:grid-cols-2 gap-6">
+
+        <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">1</div>
+            <h3 class="font-bold text-gray-900">放置節點</h3>
+          </div>
+          <p class="text-sm text-gray-600 leading-relaxed mb-3">點擊左側工具列的元素類型（實體、弱實體、關聯…），畫布游標變成 <span class="font-mono bg-gray-200 px-1 rounded">✛</span>，再點擊畫布任意位置即可放置。</p>
+          <div class="bg-white rounded-lg p-3 border border-gray-200 text-xs text-gray-500 space-y-1">
+            <div class="flex items-center gap-2"><span class="w-5 h-3.5 border border-gray-400 rounded-sm inline-block"></span> 實體 Entity</div>
+            <div class="flex items-center gap-2"><span class="w-5 h-3.5 border border-gray-400 rounded-sm inline-block relative"><span class="absolute inset-0.5 border border-gray-400 rounded-sm"></span></span> 弱實體 Weak Entity</div>
+            <div class="flex items-center gap-2"><span class="inline-block w-4 h-4 border border-gray-400 rotate-45"></span> 關聯 Relationship</div>
+            <div class="flex items-center gap-2"><span class="inline-block w-3.5 h-3.5 rounded-full border border-gray-400"></span> 屬性 Attribute</div>
+            <div class="flex items-center gap-2"><span class="inline-block w-3.5 h-3.5 rounded-full border border-gray-400 relative"><span class="absolute inset-0.5 rounded-full border border-gray-400"></span></span> 多值屬性 Multi-value</div>
+            <div class="flex items-center gap-2"><span class="inline-block w-3.5 h-3.5 rounded-full border border-gray-400 border-dashed"></span> 衍生屬性 Derived</div>
+            <div class="flex items-center gap-2"><span class="inline-block w-5 h-4 border border-gray-400 rounded-sm relative"><span class="absolute left-1 top-1 w-2.5 h-2 border border-gray-400 rotate-45"></span></span> 聚合 Aggregation</div>
+          </div>
+        </div>
+
+        <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">2</div>
+            <h3 class="font-bold text-gray-900">選取節點與工具列</h3>
+          </div>
+          <p class="text-sm text-gray-600 leading-relaxed mb-3">點擊節點後浮現工具列，含以下操作：</p>
+          <div class="space-y-2 text-sm">
+            <div class="flex items-start gap-2"><span class="w-16 text-xs bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded flex-shrink-0 text-center">連線</span><span class="text-gray-600">點另一個節點完成連線；再點同節點取消</span></div>
+            <div class="flex items-start gap-2"><span class="w-16 text-xs bg-green-50 text-green-700 font-semibold px-2 py-0.5 rounded flex-shrink-0 text-center">新增</span><span class="text-gray-600">選類型 → 點畫布放置，自動連回原節點</span></div>
+            <div class="flex items-start gap-2"><span class="w-16 text-xs bg-purple-50 text-purple-700 font-semibold px-2 py-0.5 rounded flex-shrink-0 text-center">複製</span><span class="text-gray-600">在附近複製一個相同節點</span></div>
+            <div class="flex items-start gap-2"><span class="w-16 text-xs bg-amber-50 text-amber-700 font-semibold px-2 py-0.5 rounded flex-shrink-0 text-center">🔓 鎖定</span><span class="text-gray-600">鎖定後無法拖動，防止意外移位；再按解鎖</span></div>
+            <div class="flex items-start gap-2"><span class="w-16 text-xs bg-red-50 text-red-700 font-semibold px-2 py-0.5 rounded flex-shrink-0 text-center">刪除</span><span class="text-gray-600">刪除節點及其所有連線</span></div>
+          </div>
+        </div>
+
+        <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">3</div>
+            <h3 class="font-bold text-gray-900">編輯節點文字</h3>
+          </div>
+          <p class="text-sm text-gray-600 leading-relaxed mb-3"><strong>雙擊節點</strong>進入文字編輯模式，直接修改標籤名稱。</p>
+          <p class="text-sm text-gray-600 leading-relaxed">頂部工具列可設定選取節點的：字級大小、字型、<strong>粗體</strong>、<em>斜體</em>、顏色。</p>
+        </div>
+
+        <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">4</div>
+            <h3 class="font-bold text-gray-900">連線與基數標記</h3>
+          </div>
+          <p class="text-sm text-gray-600 leading-relaxed mb-3"><strong>右鍵點擊連線</strong>開啟選單，可刪除連線或設定基數標記。</p>
+          <p class="text-sm text-gray-600 leading-relaxed mb-3">基數標記顯示在連線兩端靠近節點處，可輸入任意文字（1、n、m…）或選快速預設：</p>
+          <div class="flex gap-2 flex-wrap">
+            <span class="text-xs bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-md font-mono font-semibold">1:1</span>
+            <span class="text-xs bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-md font-mono font-semibold">1:n</span>
+            <span class="text-xs bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-md font-mono font-semibold">n:1</span>
+            <span class="text-xs bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-md font-mono font-semibold">m:n</span>
+          </div>
+        </div>
+
+        <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">5</div>
+            <h3 class="font-bold text-gray-900">畫布操作</h3>
+          </div>
+          <div class="space-y-2 text-sm text-gray-600">
+            <div class="flex gap-3"><span class="font-semibold text-gray-700 w-28 flex-shrink-0">縮放</span>滾輪（Trackpad 雙指）</div>
+            <div class="flex gap-3"><span class="font-semibold text-gray-700 w-28 flex-shrink-0">平移畫布</span>拖拉空白處</div>
+            <div class="flex gap-3"><span class="font-semibold text-gray-700 w-28 flex-shrink-0">全覽</span>點頂部「全覽」按鈕</div>
+            <div class="flex gap-3"><span class="font-semibold text-gray-700 w-28 flex-shrink-0">移動節點</span>拖拉節點</div>
+            <div class="flex gap-3"><span class="font-semibold text-gray-700 w-28 flex-shrink-0">多選節點</span>框選（拖拉空白處時按住 Shift）</div>
+          </div>
+        </div>
+
+        <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">6</div>
+            <h3 class="font-bold text-gray-900">匯出與分享</h3>
+          </div>
+          <div class="space-y-2 text-sm text-gray-600">
+            <div class="flex gap-3"><span class="font-semibold text-gray-700 w-24 flex-shrink-0">匯出 SVG</span>右上角「匯出 SVG」按鈕，下載向量圖</div>
+            <div class="flex gap-3"><span class="font-semibold text-gray-700 w-24 flex-shrink-0">分享連結</span>右上角「分享」→ 設定唯讀或可編輯 → 複製連結</div>
+            <div class="flex gap-3"><span class="font-semibold text-gray-700 w-24 flex-shrink-0">即時協作</span>多位使用者同時編輯，頭像顯示在線上人員</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── 邏輯模型教學 ── -->
+    <div id="tut-lm" class="tut-panel hidden">
+      <div class="grid md:grid-cols-2 gap-6">
+
+        <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">1</div>
+            <h3 class="font-bold text-gray-900">建立邏輯模型</h3>
+          </div>
+          <p class="text-sm text-gray-600 leading-relaxed">在 Home 頁面點擊「新增邏輯模型」，或在已有 ER 圖中點「連結 ER 圖 → 轉換」，自動依 ER 實體產生資料表與欄位。</p>
+        </div>
+
+        <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">2</div>
+            <h3 class="font-bold text-gray-900">表格操作</h3>
+          </div>
+          <div class="space-y-2 text-sm text-gray-600">
+            <div class="flex gap-3"><span class="font-semibold text-gray-700 w-20 flex-shrink-0">新增表格</span>點擊左側「資料表」後放置到畫布</div>
+            <div class="flex gap-3"><span class="font-semibold text-gray-700 w-20 flex-shrink-0">改名</span>雙擊表格標題，或點工具列「改名」</div>
+            <div class="flex gap-3"><span class="font-semibold text-gray-700 w-20 flex-shrink-0">移動</span>拖拉表格標題列</div>
+            <div class="flex gap-3"><span class="font-semibold text-gray-700 w-20 flex-shrink-0">刪除表格</span>點工具列「刪除」或按 <span class="font-mono bg-gray-100 px-1 rounded">Delete</span></div>
+          </div>
+        </div>
+
+        <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">3</div>
+            <h3 class="font-bold text-gray-900">欄位操作</h3>
+          </div>
+          <p class="text-sm text-gray-600 leading-relaxed mb-3">點擊欄位列 → 右側出現欄位工具列：</p>
+          <div class="space-y-1.5 text-sm">
+            <div class="flex items-start gap-2"><span class="text-xs bg-amber-50 text-amber-700 font-bold px-1.5 py-0.5 rounded flex-shrink-0">PK</span><span class="text-gray-600">設為主鍵</span></div>
+            <div class="flex items-start gap-2"><span class="text-xs bg-blue-50 text-blue-700 font-bold px-1.5 py-0.5 rounded flex-shrink-0">FK</span><span class="text-gray-600">標記外鍵</span></div>
+            <div class="flex items-start gap-2"><span class="text-xs bg-gray-100 text-gray-700 font-bold px-1.5 py-0.5 rounded flex-shrink-0">← →</span><span class="text-gray-600">在當前欄位前後插入新欄位</span></div>
+            <div class="flex items-start gap-2"><span class="text-xs bg-purple-50 text-purple-700 font-bold px-1.5 py-0.5 rounded flex-shrink-0">連線</span><span class="text-gray-600">建立 FK 箭頭連結至另一表格欄位</span></div>
+            <div class="flex items-start gap-2"><span class="text-xs bg-gray-100 text-gray-700 font-bold px-1.5 py-0.5 rounded flex-shrink-0">改名</span><span class="text-gray-600">雙擊欄位或點「改名」直接輸入</span></div>
+            <div class="flex items-start gap-2"><span class="text-xs bg-red-50 text-red-700 font-bold px-1.5 py-0.5 rounded flex-shrink-0">刪除</span><span class="text-gray-600">刪除該欄位（至少保留一欄）</span></div>
+          </div>
+        </div>
+
+        <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">4</div>
+            <h3 class="font-bold text-gray-900">連結 ER 圖自動轉換</h3>
+          </div>
+          <p class="text-sm text-gray-600 leading-relaxed mb-2">點右上角「連結 ER 圖」→ 選擇目標 ER 圖 → 點「從 ER 圖轉換」，系統自動：</p>
+          <ul class="text-sm text-gray-600 list-disc list-inside space-y-1">
+            <li>以每個 ER 實體建立對應資料表</li>
+            <li>實體屬性自動成為欄位</li>
+            <li>已存在同名表格不重複建立</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── 實體模型教學 ── -->
+    <div id="tut-pm" class="tut-panel hidden">
+      <div class="grid md:grid-cols-2 gap-6">
+
+        <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">1</div>
+            <h3 class="font-bold text-gray-900">表格結構（三欄式）</h3>
+          </div>
+          <p class="text-sm text-gray-600 leading-relaxed mb-3">每個資料表顯示三欄：</p>
+          <div class="bg-white rounded-lg border border-gray-200 overflow-hidden text-xs">
+            <div class="grid grid-cols-3 bg-slate-100 border-b border-gray-200 font-bold text-gray-500 px-2 py-1.5">
+              <span>欄位名稱</span><span>型別</span><span>說明</span>
+            </div>
+            <div class="grid grid-cols-3 px-2 py-1.5 border-b border-gray-100">
+              <span class="flex items-center gap-1"><span class="text-red-600 font-bold text-[10px]">PK</span> id</span>
+              <span class="font-mono text-slate-500">INT</span>
+              <span class="text-slate-400">主鍵</span>
+            </div>
+            <div class="grid grid-cols-3 px-2 py-1.5 border-b border-gray-100">
+              <span class="flex items-center gap-1"><span class="text-blue-600 font-bold text-[10px]">FK</span> dept_id</span>
+              <span class="font-mono text-slate-500">INT</span>
+              <span class="text-slate-400">外部鍵</span>
+            </div>
+            <div class="grid grid-cols-3 px-2 py-1.5">
+              <span class="pl-1">name</span>
+              <span class="font-mono text-slate-500">VARCHAR</span>
+              <span class="text-slate-400">建立索引</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">2</div>
+            <h3 class="font-bold text-gray-900">欄位屬性設定</h3>
+          </div>
+          <p class="text-sm text-gray-600 leading-relaxed mb-3">點擊欄位 → 右側工具列設定：</p>
+          <div class="space-y-1.5 text-sm">
+            <div class="flex items-start gap-2"><span class="text-xs bg-amber-50 text-amber-700 font-bold px-1.5 py-0.5 rounded flex-shrink-0">PK</span><span class="text-gray-600">設為主鍵（黃色，自動帶底線）</span></div>
+            <div class="flex items-start gap-2"><span class="text-xs bg-blue-50 text-blue-700 font-bold px-1.5 py-0.5 rounded flex-shrink-0">FK</span><span class="text-gray-600">標記外鍵（藍色）</span></div>
+            <div class="flex items-start gap-2"><span class="text-xs bg-gray-100 text-gray-700 font-bold px-1.5 py-0.5 rounded flex-shrink-0">NN</span><span class="text-gray-600">非空約束（欄位名底線）</span></div>
+            <div class="flex items-start gap-2"><span class="text-xs bg-gray-100 text-gray-700 font-bold px-1.5 py-0.5 rounded flex-shrink-0">型別</span><span class="text-gray-600">INT / BIGINT / VARCHAR / CHAR / TEXT / FLOAT / DECIMAL / DATE / DATETIME / TIMESTAMP / BOOLEAN / BLOB</span></div>
+            <div class="flex items-start gap-2"><span class="text-xs bg-gray-100 text-gray-700 font-bold px-1.5 py-0.5 rounded flex-shrink-0">說明</span><span class="text-gray-600">自由輸入：主鍵、外部鍵、建立索引[索引:欄位名]…</span></div>
+          </div>
+        </div>
+
+        <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">3</div>
+            <h3 class="font-bold text-gray-900">FK 連線</h3>
+          </div>
+          <p class="text-sm text-gray-600 leading-relaxed mb-2">建立外鍵關聯箭頭有兩種方式：</p>
+          <ol class="text-sm text-gray-600 space-y-2 list-decimal list-inside">
+            <li>點選表格 → 工具列「FK 連線」→ 點來源欄位 → 點目標欄位</li>
+            <li>點選欄位 → 工具列「連線」→ 點目標表格欄位</li>
+          </ol>
+          <p class="text-sm text-gray-500 mt-3">點擊 FK 箭頭可刪除連線。</p>
+        </div>
+
+        <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">4</div>
+            <h3 class="font-bold text-gray-900">匯出 SQL DDL</h3>
+          </div>
+          <p class="text-sm text-gray-600 leading-relaxed mb-3">點右上角「匯出 SQL DDL」，選擇方言後即時產生建表語法：</p>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div class="bg-white border border-gray-200 rounded-lg p-2.5">
+              <div class="font-bold text-gray-700 mb-1">MySQL</div>
+              <div class="text-gray-500 font-mono text-[10px]">AUTO_INCREMENT<br/>COMMENT '主鍵'</div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-lg p-2.5">
+              <div class="font-bold text-gray-700 mb-1">PostgreSQL</div>
+              <div class="text-gray-500 font-mono text-[10px]">SERIAL / BIGSERIAL<br/>COMMENT ON COLUMN</div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-lg p-2.5">
+              <div class="font-bold text-gray-700 mb-1">SQLite</div>
+              <div class="text-gray-500 font-mono text-[10px]">VARCHAR → TEXT<br/>-- 說明 (inline)</div>
+            </div>
+            <div class="bg-white border border-gray-200 rounded-lg p-2.5">
+              <div class="font-bold text-gray-700 mb-1">SQL Server</div>
+              <div class="text-gray-500 font-mono text-[10px]">IDENTITY(1,1)<br/>NVARCHAR / BIT</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 md:col-span-2">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">5</div>
+            <h3 class="font-bold text-gray-900">從邏輯模型匯入</h3>
+          </div>
+          <p class="text-sm text-gray-600 leading-relaxed mb-3">點右上角「連結邏輯模型」→ 選取目標邏輯模型 → 點「從邏輯模型匯入」，系統自動：</p>
+          <ul class="text-sm text-gray-600 list-disc list-inside space-y-1 grid sm:grid-cols-2">
+            <li>以邏輯模型每張表格建立實體資料表</li>
+            <li>同步 PK / FK 欄位屬性</li>
+            <li>自動填入「說明」欄（主鍵/外部鍵）</li>
+            <li>已存在同名表格不重複建立</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── 快捷鍵 ── -->
+    <div id="tut-keys" class="tut-panel hidden">
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+        <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+          <h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <span class="text-blue-600">◈</span> ER 圖 &amp; 通用
+          </h3>
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">上一步（復原）</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">Ctrl / ⌘ Z</kbd>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">下一步（重做）</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">Ctrl / ⌘ Y</kbd>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">下一步（重做）</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">⇧ Z</kbd>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">強制儲存</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">Ctrl / ⌘ S</kbd>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">取消目前操作</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">Esc</kbd>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">刪除選取節點</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">Backspace / Delete</kbd>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">縮放</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">滾輪</kbd>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+          <h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <span class="text-purple-600">◈</span> 邏輯模型
+          </h3>
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">上一步</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">Ctrl / ⌘ Z</kbd>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">下一步</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">Ctrl / ⌘ Y</kbd>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">強制儲存</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">Ctrl / ⌘ S</kbd>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">刪除選取表格</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">Delete</kbd>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">確認編輯</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">Enter</kbd>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">取消編輯 / 操作</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">Esc</kbd>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">縮放</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">滾輪</kbd>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+          <h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <span class="text-emerald-600">◈</span> 實體模型
+          </h3>
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">上一步</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">Ctrl / ⌘ Z</kbd>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">下一步</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">Ctrl / ⌘ Y</kbd>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">強制儲存</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">Ctrl / ⌘ S</kbd>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">刪除選取表格</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">Backspace / Delete</kbd>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">確認編輯</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">Enter</kbd>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">取消放置 / FK連線</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">Esc</kbd>
+            </div>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-600">縮放</span>
+              <kbd class="bg-white border border-gray-200 rounded px-2 py-0.5 text-xs font-mono shadow-sm">滾輪</kbd>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<script>
+function switchTab(id) {
+  document.querySelectorAll('.tut-panel').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.tut-tab').forEach(b => {
+    b.classList.remove('active','bg-white','text-blue-600','shadow-sm');
+    b.classList.add('text-gray-500');
+  });
+  document.getElementById('tut-' + id).classList.remove('hidden');
+  const btn = document.getElementById('tab-' + id);
+  btn.classList.add('active','bg-white','shadow-sm');
+  btn.classList.remove('text-gray-500');
+  btn.classList.add(id==='er'?'text-blue-600':id==='lm'?'text-purple-600':id==='pm'?'text-emerald-600':'text-gray-700');
+}
+</script>
 
 <!-- ===== CTA BANNER ===== -->
 <section class="py-16 bg-primary-light">
