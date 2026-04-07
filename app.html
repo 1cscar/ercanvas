@@ -3132,17 +3132,32 @@ document.getElementById('lm-btn-convert').addEventListener('click', async()=>{
     if(!snap.exists()){ alert('找不到連結的 ER 圖'); return; }
     const erData=snap.data(), nodes=erData.nodes||[], edges=erData.edges||[];
     const entities=nodes.filter(n=>n.type==='entity'||n.type==='weak-entity');
-    let added=0;
+    // Build new tables (skip duplicates)
+    const newTbls=[];
     entities.forEach(entity=>{
-      if(SL.tables.find(t=>t.name===entity.label)) return; // skip duplicates
+      if(SL.tables.find(t=>t.name===entity.label)) return;
       const attrIds=edges.filter(e=>e.from===entity.id||e.to===entity.id).map(e=>e.from===entity.id?e.to:e.from);
       const attrs=nodes.filter(n=>attrIds.includes(n.id)&&(n.type==='attribute'||n.type==='multi-value'||n.type==='derived'));
       const columns=attrs.map(a=>({id:'lc'+(SL.nextId++),name:a.label||'欄位',pk:false,fk:false}));
       if(!columns.length) columns.push({id:'lc'+(SL.nextId++),name:'id',pk:true,fk:false});
-      const tbl={id:'lt'+(SL.nextId++),name:entity.label||'表格',x:entity.x+(entity.w||0)/2,y:entity.y+(entity.h||0)/2,columns};
-      SL.tables.push(tbl); lmRenderTable(tbl); added++;
+      newTbls.push({id:'lt'+(SL.nextId++),name:entity.label||'表格',x:0,y:0,columns});
     });
+    // Auto-layout: flow into rows, widest tables first
+    const _colW=col=>Math.max(LM_MIN_COL_W, col.name.length*LM_CHAR_W+LM_COL_PAD);
+    const _tblW=tbl=>tbl.columns.reduce((s,c)=>s+_colW(c), 0)||LM_MIN_COL_W;
+    newTbls.sort((a,b)=>_tblW(b)-_tblW(a));
+    // Find a start Y below existing tables
+    const existMaxY = SL.tables.reduce((m,t)=>Math.max(m,t.y), -Infinity);
+    let curX=80, curY=(isFinite(existMaxY)?existMaxY+80:80);
+    const MAX_ROW_W=900, ROW_GAP=70, COL_GAP=50;
+    newTbls.forEach(tbl=>{
+      const tw=_tblW(tbl);
+      if(curX>80 && curX+tw>MAX_ROW_W){ curX=80; curY+=LM_COL_H+ROW_GAP; }
+      tbl.x=curX; tbl.y=curY; curX+=tw+COL_GAP;
+    });
+    newTbls.forEach(tbl=>{ SL.tables.push(tbl); lmRenderTable(tbl); });
     lmSnapshot(); lmScheduleSave();
+    const added=newTbls.length;
     alert(`已新增 ${added} 張表格。請手動標記 PK / FK 並建立連線。`);
   } catch(e){ alert('轉換失敗：'+e.message); }
 });
