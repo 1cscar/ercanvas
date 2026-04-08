@@ -1242,7 +1242,7 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signO
                                from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
          doc, setDoc, getDoc, getDocs, addDoc, deleteDoc, updateDoc, onSnapshot,
-         collection, query, orderBy, serverTimestamp }
+         collection, query, orderBy, serverTimestamp, deleteField }
                                from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js';
 import { getDatabase, ref as rref, set as rset, onValue, off as roff, remove as rremove }
                                from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js';
@@ -1469,12 +1469,13 @@ function loadHomeFast() {
   if (!grid) return;
   grid.innerHTML = '';
   loading.classList.add('hidden');
-  if (!list || !list.length) { empty.style.display = 'flex'; return; }
+  const activeList = (list || []).filter(item => !item.deletedAt);
+  if (!activeList.length) { empty.style.display = 'flex'; return; }
   empty.style.display = 'none';
-  list.forEach(item => {
+  activeList.forEach(item => {
     // 讀完整快取（有就用完整資料渲染，否則用 list metadata 渲染）
     const full = loadDiagCache(item.id);
-    if (full && (Array.isArray(full.nodes) || Array.isArray(full.tables))) {
+    if (full && !full.deletedAt && (Array.isArray(full.nodes) || Array.isArray(full.tables))) {
       renderDiagramCard(item.id, full);
     } else {
       // fallback：用 list metadata 渲染（名稱、日期正確，縮略圖為空）
@@ -1501,6 +1502,7 @@ async function loadHome() {
     const docs = [];
     snaps.forEach(s => {
       const d = s.data();
+      if (d.deletedAt) return; // soft-deleted → in trash
       const isLogical = d.diagramType === 'logical';
       if (!isLogical && !Array.isArray(d.nodes)) return;
       docs.push({ id: s.id, data: d });
@@ -1570,7 +1572,7 @@ function renderDiagramCard(id, data) {
       const list = loadListCache() || [];
       localStorage.setItem(listKey(), JSON.stringify(list.filter(x => x.id !== id)));
     } catch(e2) {}
-    moveDiagramToTrash(id, data);
+    moveDiagramToTrash(id);
   });
   thumb.appendChild(delBtn);
   card.appendChild(thumb);
@@ -1698,25 +1700,21 @@ async function openDiagram(id, data) {
 // ── Trash ──────────────────────────────────────────────────────────────────────
 let _permDeleteTarget = null; // { id, name }
 
-async function moveDiagramToTrash(id, data) {
+async function moveDiagramToTrash(id) {
   try {
-    const trashData = { ...data, deletedAt: serverTimestamp() };
-    await setDoc(doc(db, 'users', currentUser.uid, 'trash', id), trashData);
-    await deleteDoc(doc(db, 'users', currentUser.uid, 'diagrams', id));
+    await updateDoc(doc(db, 'users', currentUser.uid, 'diagrams', id), { deletedAt: serverTimestamp() });
     updateTrashBadge();
   } catch(e) { console.error('移至垃圾桶失敗:', e); }
 }
 
 async function updateTrashBadge() {
   try {
-    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'trash'));
+    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'diagrams'));
+    let count = 0;
+    snaps.forEach(s => { if (s.data().deletedAt) count++; });
     const badge = document.getElementById('trash-count-badge');
-    if (snaps.size > 0) {
-      badge.textContent = snaps.size;
-      badge.style.display = 'inline';
-    } else {
-      badge.style.display = 'none';
-    }
+    if (count > 0) { badge.textContent = count; badge.style.display = 'inline'; }
+    else { badge.style.display = 'none'; }
   } catch(e) {}
 }
 
@@ -1725,10 +1723,12 @@ async function loadTrash() {
   const empty = document.getElementById('trash-empty');
   grid.innerHTML = '';
   try {
-    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'trash'));
-    if (!snaps.size) { empty.style.display = 'flex'; return; }
+    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'diagrams'));
+    const trashed = [];
+    snaps.forEach(s => { if (s.data().deletedAt) trashed.push({ id: s.id, data: s.data() }); });
+    if (!trashed.length) { empty.style.display = 'flex'; return; }
     empty.style.display = 'none';
-    snaps.forEach(d => renderTrashCard(d.id, d.data()));
+    trashed.forEach(({ id, data }) => renderTrashCard(id, data));
   } catch(e) { console.error('loadTrash error:', e); }
 }
 
@@ -1765,13 +1765,7 @@ function renderTrashCard(id, data) {
 
 async function restoreDiagram(id) {
   try {
-    const snap = await getDoc(doc(db, 'users', currentUser.uid, 'trash', id));
-    if (!snap.exists()) return;
-    const data = snap.data();
-    delete data.deletedAt;
-    await setDoc(doc(db, 'users', currentUser.uid, 'diagrams', id), { ...data, updatedAt: serverTimestamp() });
-    await deleteDoc(doc(db, 'users', currentUser.uid, 'trash', id));
-    // Remove card from trash grid
+    await updateDoc(doc(db, 'users', currentUser.uid, 'diagrams', id), { deletedAt: deleteField() });
     document.querySelector(`#trash-grid [data-id="${id}"]`)?.remove();
     if (!document.getElementById('trash-grid').children.length)
       document.getElementById('trash-empty').style.display = 'flex';
@@ -1781,7 +1775,7 @@ async function restoreDiagram(id) {
 
 async function permanentDeleteDiagram(id) {
   try {
-    await deleteDoc(doc(db, 'users', currentUser.uid, 'trash', id));
+    await deleteDoc(doc(db, 'users', currentUser.uid, 'diagrams', id));
     document.querySelector(`#trash-grid [data-id="${id}"]`)?.remove();
     if (!document.getElementById('trash-grid').children.length)
       document.getElementById('trash-empty').style.display = 'flex';
