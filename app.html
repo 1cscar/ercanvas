@@ -399,7 +399,10 @@
       <input id="inline-edit" type="text"/>
 
       <!-- Format bar (shown above inline-edit when editing) -->
-      <div id="format-bar" style="display:none; position:absolute; z-index:210; background:white; border:1px solid #e5e7eb; border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,0.13); padding:5px 10px; display:none; align-items:center; gap:6px; flex-wrap:nowrap;">
+      <div id="format-bar" style="display:none; position:absolute; z-index:210; background:white; border:1px solid #e5e7eb; border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,0.13); padding:5px 10px; display:none; align-items:center; gap:6px; flex-wrap:nowrap; user-select:none;">
+        <div id="fmt-bar-handle" style="display:flex;align-items:center;padding:0 4px 0 0;cursor:grab;flex-shrink:0;" title="拖動工具列">
+          <svg width="6" height="16" viewBox="0 0 6 16" fill="none"><circle cx="1.5" cy="3"  r="1.2" fill="#d1d5db"/><circle cx="4.5" cy="3"  r="1.2" fill="#d1d5db"/><circle cx="1.5" cy="8"  r="1.2" fill="#d1d5db"/><circle cx="4.5" cy="8"  r="1.2" fill="#d1d5db"/><circle cx="1.5" cy="13" r="1.2" fill="#d1d5db"/><circle cx="4.5" cy="13" r="1.2" fill="#d1d5db"/></svg>
+        </div>
         <select id="fmt-font">
           <option value="sans-serif">Sans-serif</option>
           <option value="serif">Serif</option>
@@ -413,8 +416,11 @@
       </div>
 
       <!-- Node toolbar -->
-      <div id="node-toolbar" style="display:none; position:absolute; z-index:150;">
+      <div id="node-toolbar" style="display:none; position:absolute; z-index:150; user-select:none;">
         <div style="display:flex; flex-direction:column; gap:4px; background:white; border:1px solid #e5e7eb; border-radius:10px; box-shadow:0 4px 16px rgba(0,0,0,0.1); padding:5px;">
+          <div id="node-tb-handle" style="display:flex;align-items:center;justify-content:center;padding:2px 0 2px;cursor:grab;" title="拖動工具列">
+            <svg width="16" height="6" viewBox="0 0 16 6" fill="none"><circle cx="3" cy="1.5" r="1.2" fill="#d1d5db"/><circle cx="8" cy="1.5" r="1.2" fill="#d1d5db"/><circle cx="13" cy="1.5" r="1.2" fill="#d1d5db"/><circle cx="3" cy="4.5" r="1.2" fill="#d1d5db"/><circle cx="8" cy="4.5" r="1.2" fill="#d1d5db"/><circle cx="13" cy="4.5" r="1.2" fill="#d1d5db"/></svg>
+          </div>
           <button id="tb-connect" style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#EFF6FF;color:#2563EB;text-align:left;">連線</button>
           <button id="tb-add"     style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#F0FDF4;color:#16A34A;text-align:left;">新增</button>
           <button id="tb-copy"    style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#F5F3FF;color:#7C3AED;text-align:left;">複製</button>
@@ -926,8 +932,11 @@
       <input id="lm-inline-edit" type="text"/>
 
       <!-- Table toolbar -->
-      <div id="lm-table-toolbar" style="display:none; position:absolute; z-index:150;">
+      <div id="lm-table-toolbar" style="display:none; position:absolute; z-index:150; user-select:none;">
         <div style="display:flex;flex-direction:column;gap:3px;background:white;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.1);padding:5px;min-width:96px;">
+          <div id="lm-tbar-handle" style="display:flex;align-items:center;justify-content:center;padding:2px 0 2px;cursor:grab;" title="拖動工具列">
+            <svg width="16" height="6" viewBox="0 0 16 6" fill="none"><circle cx="3" cy="1.5" r="1.2" fill="#d1d5db"/><circle cx="8" cy="1.5" r="1.2" fill="#d1d5db"/><circle cx="13" cy="1.5" r="1.2" fill="#d1d5db"/><circle cx="3" cy="4.5" r="1.2" fill="#d1d5db"/><circle cx="8" cy="4.5" r="1.2" fill="#d1d5db"/><circle cx="13" cy="4.5" r="1.2" fill="#d1d5db"/></svg>
+          </div>
           <button id="lm-tb-add-col"    style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#F0FDF4;color:#16A34A;text-align:left;">＋ 新增欄位</button>
           <button id="lm-tb-fk-connect" style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#F5F3FF;color:#7C3AED;text-align:left;">FK 連線</button>
           <hr style="border:none;border-top:1px solid #f1f5f9;margin:1px 0;"/>
@@ -1081,8 +1090,11 @@
       <input id="pm-inline-edit" type="text" style="position:absolute;display:none;z-index:200;background:rgba(255,255,255,0.92);border:2px solid #2563EB;border-radius:5px;padding:3px 8px;outline:none;text-align:center;min-width:80px;font-size:12px;"/>
 
       <!-- Table toolbar (physical) -->
-      <div id="pm-table-toolbar" style="display:none; position:absolute; z-index:150;">
+      <div id="pm-table-toolbar" style="display:none; position:absolute; z-index:150; user-select:none;">
         <div style="display:flex;flex-direction:column;gap:3px;background:white;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.1);padding:5px;min-width:96px;">
+          <div id="pm-tbar-handle" style="display:flex;align-items:center;justify-content:center;padding:2px 0 2px;cursor:grab;" title="拖動工具列">
+            <svg width="16" height="6" viewBox="0 0 16 6" fill="none"><circle cx="3" cy="1.5" r="1.2" fill="#d1d5db"/><circle cx="8" cy="1.5" r="1.2" fill="#d1d5db"/><circle cx="13" cy="1.5" r="1.2" fill="#d1d5db"/><circle cx="3" cy="4.5" r="1.2" fill="#d1d5db"/><circle cx="8" cy="4.5" r="1.2" fill="#d1d5db"/><circle cx="13" cy="4.5" r="1.2" fill="#d1d5db"/></svg>
+          </div>
           <button id="pm-tb-add-col"    style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#F0FDF4;color:#16A34A;text-align:left;">＋ 新增欄位</button>
           <button id="pm-tb-fk-connect" style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#F5F3FF;color:#7C3AED;text-align:left;">FK 連線</button>
           <hr style="border:none;border-top:1px solid #f1f5f9;margin:1px 0;"/>
@@ -1092,8 +1104,11 @@
       </div>
 
       <!-- Column toolbar (physical) -->
-      <div id="pm-col-toolbar" style="display:none; position:absolute; z-index:160;">
+      <div id="pm-col-toolbar" style="display:none; position:absolute; z-index:160; user-select:none;">
         <div style="display:flex;flex-direction:column;gap:3px;background:white;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.1);padding:5px;min-width:130px;">
+          <div id="pm-cbar-handle" style="display:flex;align-items:center;justify-content:center;padding:2px 0 2px;cursor:grab;" title="拖動工具列">
+            <svg width="16" height="6" viewBox="0 0 16 6" fill="none"><circle cx="3" cy="1.5" r="1.2" fill="#d1d5db"/><circle cx="8" cy="1.5" r="1.2" fill="#d1d5db"/><circle cx="13" cy="1.5" r="1.2" fill="#d1d5db"/><circle cx="3" cy="4.5" r="1.2" fill="#d1d5db"/><circle cx="8" cy="4.5" r="1.2" fill="#d1d5db"/><circle cx="13" cy="4.5" r="1.2" fill="#d1d5db"/></svg>
+          </div>
           <button id="pm-col-ins-before" style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#F0FDF4;color:#16A34A;text-align:left;">← 往前插入</button>
           <button id="pm-col-ins-after"  style="font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;background:#F0FDF4;color:#16A34A;text-align:left;">往後插入 →</button>
           <hr style="border:none;border-top:1px solid #f1f5f9;margin:1px 0;"/>
@@ -3740,29 +3755,41 @@ document.getElementById('lm-btn-zoom-fit').addEventListener('click',()=>{
   lmApplyTransform();
 });
 
-// ── Column toolbar drag ───────────────────────────────────────────────────────
-{
-  const handle = document.getElementById('lm-cbar-handle');
-  const bar    = document.getElementById('lm-col-toolbar');
-  let _drag = null;
-  handle.addEventListener('mousedown', e => {
-    e.stopPropagation(); e.preventDefault();
-    const rect = bar.getBoundingClientRect();
-    _drag = { ox: e.clientX - rect.left, oy: e.clientY - rect.top };
-    handle.style.cursor = 'grabbing';
-  });
+// ── Toolbar drag (unified) ────────────────────────────────────────────────────
+(function() {
+  let _drag = null; // { bar, handle, ox, oy, wrapId }
+
+  function makeDraggable(handleId, barId, wrapId) {
+    const handle = document.getElementById(handleId);
+    const bar    = document.getElementById(barId);
+    if (!handle || !bar) return;
+    handle.addEventListener('mousedown', e => {
+      e.stopPropagation(); e.preventDefault();
+      const rect = bar.getBoundingClientRect();
+      _drag = { bar, handle, ox: e.clientX - rect.left, oy: e.clientY - rect.top, wrapId };
+      handle.style.cursor = 'grabbing';
+    });
+  }
+
   window.addEventListener('mousemove', e => {
     if (!_drag) return;
-    const wr = document.getElementById('lm-canvas-wrap').getBoundingClientRect();
-    bar.style.left = (e.clientX - wr.left - _drag.ox) + 'px';
-    bar.style.top  = (e.clientY - wr.top  - _drag.oy) + 'px';
+    const wr = document.getElementById(_drag.wrapId).getBoundingClientRect();
+    _drag.bar.style.left = (e.clientX - wr.left - _drag.ox) + 'px';
+    _drag.bar.style.top  = (e.clientY - wr.top  - _drag.oy) + 'px';
   });
   window.addEventListener('mouseup', () => {
     if (!_drag) return;
+    _drag.handle.style.cursor = 'grab';
     _drag = null;
-    handle.style.cursor = 'grab';
   });
-}
+
+  makeDraggable('lm-cbar-handle', 'lm-col-toolbar',   'lm-canvas-wrap');
+  makeDraggable('lm-tbar-handle', 'lm-table-toolbar',  'lm-canvas-wrap');
+  makeDraggable('node-tb-handle', 'node-toolbar',      'canvas-wrap');
+  makeDraggable('fmt-bar-handle', 'format-bar',        'canvas-wrap');
+  makeDraggable('pm-tbar-handle', 'pm-table-toolbar',  'pm-canvas-wrap');
+  makeDraggable('pm-cbar-handle', 'pm-col-toolbar',    'pm-canvas-wrap');
+})();
 
 // ── Undo/Redo ─────────────────────────────────────────────────────────────────
 document.getElementById('lm-btn-undo').addEventListener('click',lmUndo);
