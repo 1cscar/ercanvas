@@ -223,9 +223,14 @@
         問題回報
       </button>
       <nav class="space-y-0.5 mt-1">
-        <div class="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium cursor-pointer select-none">
+        <div id="nav-my-diagrams" class="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium cursor-pointer select-none">
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 3h5l1.5 1.5H14v9H2V3z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
           我的圖表
+        </div>
+        <div id="nav-trash" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-500 hover:bg-gray-100 text-sm font-medium cursor-pointer select-none transition-colors">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2.5 4h11M6 4V2.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5V4M5 4l.5 9h5L11 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          垃圾桶
+          <span id="trash-count-badge" style="display:none;margin-left:auto;font-size:10px;background:#fee2e2;color:#dc2626;border-radius:10px;padding:1px 6px;font-weight:700;"></span>
         </div>
       </nav>
     </aside>
@@ -251,6 +256,22 @@
         </div>
         <p class="text-gray-700 font-semibold mb-1">尚無任何圖表</p>
         <p class="text-gray-400 text-sm mb-5">點擊「新增圖表」開始建立第一張 ER 圖</p>
+      </div>
+
+      <!-- Trash view -->
+      <div id="trash-view" style="display:none;">
+        <div class="flex items-center gap-3 mb-6">
+          <h1 class="text-lg font-bold text-gray-900">垃圾桶</h1>
+          <span class="text-xs text-gray-400">已刪除的圖表可在此復原或永久刪除</span>
+        </div>
+        <div id="trash-grid" class="grid gap-4" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));"></div>
+        <div id="trash-empty" style="display:none;" class="flex flex-col items-center justify-center py-28 text-center">
+          <div class="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mb-5">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M4 7h20M10 7V5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M9 7l1 16h8l1-16" stroke="#9ca3af" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <p class="text-gray-500 font-semibold mb-1">垃圾桶是空的</p>
+          <p class="text-gray-400 text-sm">已刪除的圖表會出現在這裡</p>
+        </div>
       </div>
     </main>
   </div>
@@ -814,6 +835,27 @@
   </div>
 </div>
 
+<!-- Permanent Delete Confirmation Modal -->
+<div id="perm-delete-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1100; align-items:center; justify-content:center;">
+  <div style="background:white; border-radius:16px; box-shadow:0 8px 40px rgba(0,0,0,0.2); padding:24px; width:400px; max-width:95vw; position:relative;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+      <div style="width:36px;height:36px;border-radius:50%;background:#fee2e2;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2.5 4.5h13M7 4.5V3a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1.5M6 4.5l.75 10.5h4.5L12 4.5" stroke="#dc2626" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div>
+        <h2 style="font-size:15px;font-weight:700;color:#111827;margin:0 0 2px;">永久刪除圖表</h2>
+        <p style="font-size:12px;color:#6b7280;margin:0;">此操作無法復原</p>
+      </div>
+    </div>
+    <p style="font-size:13px;color:#374151;margin:0 0 6px;">確定要永久刪除 <strong id="perm-delete-name" style="color:#111827;"></strong> 嗎？</p>
+    <p style="font-size:12px;color:#dc2626;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 12px;margin:0 0 20px;">圖表內容將被永久清除，無法再復原。</p>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button id="perm-delete-cancel" style="font-size:12px;padding:7px 16px;border:1px solid #e5e7eb;border-radius:8px;background:white;cursor:pointer;color:#374151;">取消</button>
+      <button id="perm-delete-confirm" style="font-size:12px;font-weight:600;padding:7px 16px;border:none;border-radius:8px;background:#dc2626;color:white;cursor:pointer;">永久刪除</button>
+    </div>
+  </div>
+</div>
+
 <!-- Bug Report Modal -->
 <div id="bug-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:1000; align-items:center; justify-content:center;">
   <div style="background:white; border-radius:16px; box-shadow:0 8px 40px rgba(0,0,0,0.2); padding:24px; width:460px; max-width:95vw; max-height:90vh; overflow-y:auto; position:relative;">
@@ -1350,6 +1392,7 @@ function boot() {
       if (!_cachedSession) { show('home'); }
       // Background sync from Firestore
       loadHome();
+      updateTrashBadge();
     } else {
       localStorage.removeItem('er_session');
       show('login');
@@ -1505,23 +1548,29 @@ function renderDiagramCard(id, data) {
   delBtn.title = '刪除圖表';
   delBtn.addEventListener('click', e => {
     e.stopPropagation();
-    const label = data.isShared ? '從我的清單移除' : '刪除';
-    if (!confirm(`確定${label}「${data.name || '未命名圖表'}」？`)) return;
-    // 立即從畫面移除
+    if (data.isShared) {
+      // Shared diagrams: just remove from list (no trash)
+      if (!confirm(`確定從我的清單移除「${data.name || '未命名圖表'}」？`)) return;
+      card.remove();
+      if (!document.getElementById('home-grid').children.length)
+        document.getElementById('home-empty').style.display='flex';
+      try {
+        localStorage.removeItem(diagKey(id));
+        const list = loadListCache() || [];
+        localStorage.setItem(listKey(), JSON.stringify(list.filter(x => x.id !== id)));
+      } catch(e2) {}
+      return;
+    }
+    // Own diagrams: move to trash
     card.remove();
     if (!document.getElementById('home-grid').children.length)
       document.getElementById('home-empty').style.display='flex';
-    // 同步清除 localStorage
     try {
       localStorage.removeItem(diagKey(id));
       const list = loadListCache() || [];
       localStorage.setItem(listKey(), JSON.stringify(list.filter(x => x.id !== id)));
-    } catch(e) {}
-    // 只有自己的圖表才刪 Firestore
-    if (!data.isShared) {
-      deleteDoc(doc(db, 'users', currentUser.uid, 'diagrams', id))
-        .catch(e => console.error('刪除失敗:', e));
-    }
+    } catch(e2) {}
+    moveDiagramToTrash(id, data);
   });
   thumb.appendChild(delBtn);
   card.appendChild(thumb);
@@ -1646,6 +1695,146 @@ async function openDiagram(id, data) {
   startPresence(id);
 }
 
+// ── Trash ──────────────────────────────────────────────────────────────────────
+let _permDeleteTarget = null; // { id, name }
+
+async function moveDiagramToTrash(id, data) {
+  try {
+    const trashData = { ...data, deletedAt: serverTimestamp() };
+    await setDoc(doc(db, 'users', currentUser.uid, 'trash', id), trashData);
+    await deleteDoc(doc(db, 'users', currentUser.uid, 'diagrams', id));
+    updateTrashBadge();
+  } catch(e) { console.error('移至垃圾桶失敗:', e); }
+}
+
+async function updateTrashBadge() {
+  try {
+    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'trash'));
+    const badge = document.getElementById('trash-count-badge');
+    if (snaps.size > 0) {
+      badge.textContent = snaps.size;
+      badge.style.display = 'inline';
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch(e) {}
+}
+
+async function loadTrash() {
+  const grid = document.getElementById('trash-grid');
+  const empty = document.getElementById('trash-empty');
+  grid.innerHTML = '';
+  try {
+    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'trash'));
+    if (!snaps.size) { empty.style.display = 'flex'; return; }
+    empty.style.display = 'none';
+    snaps.forEach(d => renderTrashCard(d.id, d.data()));
+  } catch(e) { console.error('loadTrash error:', e); }
+}
+
+function renderTrashCard(id, data) {
+  const grid = document.getElementById('trash-grid');
+  const card = document.createElement('div');
+  card.className = 'bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col';
+  card.dataset.id = id;
+
+  const preview = (data.diagramType === 'logical')
+    ? buildLogicalPreviewSVG(data.tables || [])
+    : buildPreviewSVG(data.nodes || [], data.edges || []);
+  const thumb = document.createElement('div');
+  thumb.className = 'h-32 bg-gray-50 flex items-center justify-center overflow-hidden border-b border-gray-100 relative opacity-60';
+  thumb.innerHTML = preview;
+  card.appendChild(thumb);
+
+  const footer = document.createElement('div');
+  footer.className = 'px-3 py-2.5';
+  const dtype = data.diagramType || 'er';
+  footer.innerHTML = `
+    <div class="flex items-center gap-1.5 mb-2">
+      <p class="text-xs font-semibold text-gray-500 truncate flex-1">${data.name || '未命名圖表'}</p>
+      ${dtype==='logical' ? '<span style="font-size:9px;background:#f3e8ff;color:#7c3aed;border:1px solid #e9d5ff;border-radius:4px;padding:1px 5px;flex-shrink:0;font-weight:700;">邏輯</span>' : ''}
+      ${dtype==='physical' ? '<span style="font-size:9px;background:#ecfdf5;color:#059669;border:1px solid #a7f3d0;border-radius:4px;padding:1px 5px;flex-shrink:0;font-weight:700;">實體</span>' : ''}
+    </div>
+    <div style="display:flex;gap:6px;">
+      <button class="trash-restore-btn flex-1 text-xs font-semibold py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer" data-id="${id}">復原</button>
+      <button class="trash-perm-del-btn flex-1 text-xs font-semibold py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer" data-id="${id}" data-name="${(data.name||'未命名圖表').replace(/"/g,'&quot;')}">永久刪除</button>
+    </div>`;
+  card.appendChild(footer);
+  grid.appendChild(card);
+}
+
+async function restoreDiagram(id) {
+  try {
+    const snap = await getDoc(doc(db, 'users', currentUser.uid, 'trash', id));
+    if (!snap.exists()) return;
+    const data = snap.data();
+    delete data.deletedAt;
+    await setDoc(doc(db, 'users', currentUser.uid, 'diagrams', id), { ...data, updatedAt: serverTimestamp() });
+    await deleteDoc(doc(db, 'users', currentUser.uid, 'trash', id));
+    // Remove card from trash grid
+    document.querySelector(`#trash-grid [data-id="${id}"]`)?.remove();
+    if (!document.getElementById('trash-grid').children.length)
+      document.getElementById('trash-empty').style.display = 'flex';
+    updateTrashBadge();
+  } catch(e) { console.error('復原失敗:', e); }
+}
+
+async function permanentDeleteDiagram(id) {
+  try {
+    await deleteDoc(doc(db, 'users', currentUser.uid, 'trash', id));
+    document.querySelector(`#trash-grid [data-id="${id}"]`)?.remove();
+    if (!document.getElementById('trash-grid').children.length)
+      document.getElementById('trash-empty').style.display = 'flex';
+    updateTrashBadge();
+  } catch(e) { console.error('永久刪除失敗:', e); }
+}
+
+// Trash grid event delegation
+document.getElementById('trash-grid').addEventListener('click', e => {
+  const restoreBtn = e.target.closest('.trash-restore-btn');
+  if (restoreBtn) { restoreDiagram(restoreBtn.dataset.id); return; }
+  const permDelBtn = e.target.closest('.trash-perm-del-btn');
+  if (permDelBtn) {
+    _permDeleteTarget = { id: permDelBtn.dataset.id, name: permDelBtn.dataset.name };
+    document.getElementById('perm-delete-name').textContent = `「${_permDeleteTarget.name}」`;
+    document.getElementById('perm-delete-modal').style.display = 'flex';
+  }
+});
+
+document.getElementById('perm-delete-cancel').addEventListener('click', () => {
+  document.getElementById('perm-delete-modal').style.display = 'none';
+  _permDeleteTarget = null;
+});
+document.getElementById('perm-delete-confirm').addEventListener('click', async () => {
+  if (!_permDeleteTarget) return;
+  document.getElementById('perm-delete-modal').style.display = 'none';
+  await permanentDeleteDiagram(_permDeleteTarget.id);
+  _permDeleteTarget = null;
+});
+
+// Sidebar nav switching
+document.getElementById('nav-my-diagrams').addEventListener('click', () => {
+  document.getElementById('nav-my-diagrams').className = 'flex items-center gap-2.5 px-3 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium cursor-pointer select-none';
+  document.getElementById('nav-trash').className = 'flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-500 hover:bg-gray-100 text-sm font-medium cursor-pointer select-none transition-colors';
+  document.getElementById('home-grid').style.display = '';
+  document.getElementById('home-empty').style.display = '';
+  document.getElementById('trash-view').style.display = 'none';
+  // Restore home title
+  document.querySelector('main .flex.items-center.gap-3.mb-6 h1').textContent = '我的圖表';
+  document.querySelector('main .flex.items-center.gap-3.mb-6 #home-loading').style.display = '';
+  loadHomeFast(); loadHome();
+});
+
+document.getElementById('nav-trash').addEventListener('click', () => {
+  document.getElementById('nav-trash').className = 'flex items-center gap-2.5 px-3 py-2 rounded-lg bg-red-50 text-red-600 text-sm font-medium cursor-pointer select-none transition-colors';
+  document.getElementById('nav-my-diagrams').className = 'flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-500 hover:bg-gray-100 text-sm font-medium cursor-pointer select-none transition-colors';
+  document.getElementById('home-grid').style.display = 'none';
+  document.getElementById('home-empty').style.display = 'none';
+  document.getElementById('trash-view').style.display = 'block';
+  loadTrash();
+});
+
+// ── New diagram buttons ────────────────────────────────────────────────────────
 document.getElementById('btn-new-diagram').addEventListener('click', async () => {
   const btn = document.getElementById('btn-new-diagram');
   btn.disabled = true;
@@ -3567,6 +3756,8 @@ $lmSvg.addEventListener('click', e => {
 // Double-click to edit
 $lmSvg.addEventListener('dblclick', e => {
   if (e.target.dataset.tname) { lmOpenNameEdit(e.target.dataset.tname); return; }
+  // dragZone rect is on top of the name text — handle it here
+  if (e.target.dataset.dragZone && e.target.dataset.tableId) { lmOpenNameEdit(e.target.dataset.tableId); return; }
   if (e.target.dataset.colId && e.target.dataset.tableId) { lmOpenColEdit(e.target.dataset.tableId, e.target.dataset.colId); return; }
 });
 
