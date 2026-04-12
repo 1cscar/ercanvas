@@ -3,7 +3,44 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ERCanvas — 線上 ER 模型塑模工具</title>
+  <title>ERCanvas — 免費線上資料庫塑模工具 | ER 圖與資料庫模型設計</title>
+  <meta name="description" content="ERCanvas 是免費的線上資料庫塑模工具，支援 ER 圖繪製、邏輯資料模型與實體資料庫模型設計，無需安裝軟體，直接在瀏覽器完成資料庫塑模與團隊即時協作。" />
+  <meta name="keywords" content="資料庫塑模, 資料庫模型, ER圖, ER模型, 資料庫設計, 實體關係圖, ERD, 線上塑模工具, 邏輯模型, 資料模型設計" />
+  <meta name="author" content="ERCanvas" />
+  <link rel="canonical" href="https://ercanvas-zeta.vercel.app/" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://ercanvas-zeta.vercel.app/" />
+  <meta property="og:title" content="ERCanvas — 免費線上資料庫塑模工具" />
+  <meta property="og:description" content="免費線上資料庫塑模工具，支援 ER 圖、邏輯模型與實體模型設計，無需安裝，直接在瀏覽器完成資料庫模型設計與團隊協作。" />
+  <meta property="og:locale" content="zh_TW" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="ERCanvas — 免費線上資料庫塑模工具" />
+  <meta name="twitter:description" content="免費線上資料庫塑模工具，支援 ER 圖、邏輯模型與實體模型設計，無需安裝，直接在瀏覽器完成資料庫模型設計。" />
+
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "ERCanvas",
+    "url": "https://ercanvas-zeta.vercel.app/",
+    "description": "免費線上資料庫塑模工具，支援 ER 圖繪製、邏輯資料模型與實體資料庫模型設計，無需安裝軟體。",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Web",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "TWD"
+    },
+    "inLanguage": "zh-TW",
+    "keywords": "資料庫塑模, 資料庫模型, ER圖, ER模型, 資料庫設計"
+  }
+  </script>
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -182,13 +219,13 @@
           支援即時多人協作
         </div>
         <h1 class="text-4xl sm:text-5xl font-extrabold text-gray-900 leading-tight mb-5">
-          輕鬆繪製<br/>
-          <span class="text-primary">ER 資料模型</span><br/>
+          輕鬆完成<br/>
+          <span class="text-primary">資料庫塑模</span><br/>
           與團隊即時協作
         </h1>
         <p class="text-lg text-gray-600 mb-8 leading-relaxed">
-          拖拉即建模，一鍵轉換邏輯資料模型，<br class="hidden sm:block"/>
-          無需安裝軟體，直接在瀏覽器完成所有工作。
+          拖拉即建模，繪製 ER 圖、設計資料庫模型，<br class="hidden sm:block"/>
+          一鍵轉換邏輯模型，無需安裝軟體。
         </p>
         <div class="flex flex-col sm:flex-row gap-3">
           <a href="app.html" class="inline-flex items-center justify-center gap-2 bg-primary text-white font-semibold px-6 py-3 rounded-xl hover:bg-primary-dark transition-colors shadow-lg shadow-blue-200 text-base">
