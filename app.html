@@ -1729,7 +1729,9 @@ function boot() {
       const fromNormalize = _urlParams.get('fromNormalize') === 'true';
       const lmId = _urlParams.get('lmId');
       if (directId && directType) {
-        // Direct open from URL
+        // Direct open from URL — run once only (auth can fire multiple times)
+        if (window._directOpenDone) return;
+        window._directOpenDone = true;
         const _openDirect = async () => {
           let diagData = loadDiagCache(directId);
           if (!diagData) {
@@ -5857,16 +5859,14 @@ document.getElementById('pm-sql-download').addEventListener('click', () => {
 
 // ── Open physical diagram ─────────────────────────────────────────────────────
 function openPhysicalDiagram(id, data) {
-  // Route to relational table view if physicalStyle === 'table'
-  const src = loadDiagCache(id) || data;
+  const cached = loadDiagCache(id);
+  const src = (cached?.diagramType === 'physical' ? cached : null) || data;
   if (src.physicalStyle === 'table') {
     openPhysicalTableDiagram(id, data, false, null);
     return;
   }
   stopAllListeners();
   currentDiagramId=id;
-  const cached=loadDiagCache(id);
-  const src=(cached?.diagramType==='physical'?cached:null)||data;
   SP.tables=src.tables||[];SP.fkLinks=src.fkLinks||[];SP.nextId=src.nextId||1;
   SP.linkedLmDiagramId=src.linkedLmDiagramId||null;
   SP.selectedTableId=null;SP.selectedColId=null;SP.fkConnecting=null;SP.placingTable=false;
@@ -6038,7 +6038,7 @@ function ptSnapshot() {
   const s = JSON.stringify(STB.tables);
   HTB.stack = HTB.stack.slice(0, HTB.idx + 1);
   HTB.stack.push(s);
-  if (HTB.stack.length > 80) { HTB.stack.shift(); } else { HTB.idx++; }
+  if (HTB.stack.length > 80) { HTB.stack.shift(); HTB.idx = HTB.stack.length - 1; } else { HTB.idx++; }
   ptSyncUR();
 }
 
@@ -6226,7 +6226,6 @@ function ptOpenCellEdit(td) {
   if (!row) return;
 
   const rect = td.getBoundingClientRect();
-  const contentRect = document.getElementById('pt-content').getBoundingClientRect();
 
   if (field === 'dataType') {
     // Use a select dropdown for data type
@@ -6358,35 +6357,20 @@ document.getElementById('pt-content').addEventListener('click', e => {
     ptSnapshot(); ptScheduleSave();
     return;
   }
-  // Insert row above
-  const insAboveBtn = e.target.closest('.pt-ins-above');
-  if (insAboveBtn) {
-    const { tableId, rowId } = insAboveBtn.dataset;
+  // Insert row above / below
+  const insBtn = e.target.closest('.pt-ins-above, .pt-ins-below');
+  if (insBtn) {
+    const { tableId, rowId } = insBtn.dataset;
     const tbl = STB.tables.find(t => t.id === tableId);
     if (!tbl) return;
     const idx = tbl.rows.findIndex(r => r.id === rowId);
     if (idx < 0) return;
+    const above = insBtn.classList.contains('pt-ins-above');
     const newRow = { id: ptGenId('pr'), fieldName: '新欄位', dataType: '', constraints: '', notes: '' };
-    tbl.rows.splice(idx, 0, newRow);
+    tbl.rows.splice(above ? idx : idx + 1, 0, newRow);
     const tbody = document.getElementById('pt-tbody-' + tableId);
     const refTr = tbody?.querySelector(`tr[data-row-id="${rowId}"]`);
-    if (tbody && refTr) tbody.insertBefore(ptBuildRowEl(tableId, newRow), refTr);
-    ptSnapshot(); ptScheduleSave();
-    return;
-  }
-  // Insert row below
-  const insBelowBtn = e.target.closest('.pt-ins-below');
-  if (insBelowBtn) {
-    const { tableId, rowId } = insBelowBtn.dataset;
-    const tbl = STB.tables.find(t => t.id === tableId);
-    if (!tbl) return;
-    const idx = tbl.rows.findIndex(r => r.id === rowId);
-    if (idx < 0) return;
-    const newRow = { id: ptGenId('pr'), fieldName: '新欄位', dataType: '', constraints: '', notes: '' };
-    tbl.rows.splice(idx + 1, 0, newRow);
-    const tbody = document.getElementById('pt-tbody-' + tableId);
-    const refTr = tbody?.querySelector(`tr[data-row-id="${rowId}"]`);
-    if (tbody && refTr) tbody.insertBefore(ptBuildRowEl(tableId, newRow), refTr.nextSibling);
+    if (tbody && refTr) tbody.insertBefore(ptBuildRowEl(tableId, newRow), above ? refTr : refTr.nextSibling);
     ptSnapshot(); ptScheduleSave();
     return;
   }
@@ -6406,46 +6390,33 @@ document.getElementById('pt-content').addEventListener('click', e => {
   }
 });
 
-// Commit inline edit on Enter / blur
+function ptCommitTableName() {
+  const tbl = STB.tables.find(t => t.id === $ptEdit.dataset.tableId);
+  if (tbl) {
+    tbl.name = $ptEdit.value.trim() || '資料表';
+    const nameSpan = document.querySelector(`.pt-table-name-span[data-table-id="${tbl.id}"]`);
+    if (nameSpan) nameSpan.textContent = tbl.name;
+  }
+  $ptEdit.style.display = 'none'; _ptEditTd = null;
+  ptSnapshot(); ptScheduleSave();
+}
+
 $ptEdit.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     e.preventDefault();
-    if ($ptEdit.dataset.field === '__tableName__') {
-      const tbl = STB.tables.find(t => t.id === $ptEdit.dataset.tableId);
-      if (tbl) {
-        tbl.name = $ptEdit.value.trim() || '資料表';
-        const nameSpan = document.querySelector(`.pt-table-name-span[data-table-id="${tbl.id}"]`);
-        if (nameSpan) nameSpan.textContent = tbl.name;
-      }
-      $ptEdit.style.display = 'none'; _ptEditTd = null;
-      ptSnapshot(); ptScheduleSave();
-    } else {
-      ptCommitEdit();
-    }
+    if ($ptEdit.dataset.field === '__tableName__') ptCommitTableName();
+    else ptCommitEdit();
   }
   if (e.key === 'Escape') {
-    if ($ptEdit.dataset.field === '__tableName__') {
-      $ptEdit.style.display = 'none'; _ptEditTd = null;
-    } else {
-      ptCancelEdit();
-    }
+    if ($ptEdit.dataset.field === '__tableName__') { $ptEdit.style.display = 'none'; _ptEditTd = null; }
+    else ptCancelEdit();
   }
 });
 $ptEdit.addEventListener('blur', () => {
   setTimeout(() => {
     if ($ptEdit.style.display !== 'none') {
-      if ($ptEdit.dataset.field === '__tableName__') {
-        const tbl = STB.tables.find(t => t.id === $ptEdit.dataset.tableId);
-        if (tbl) {
-          tbl.name = $ptEdit.value.trim() || '資料表';
-          const nameSpan = document.querySelector(`.pt-table-name-span[data-table-id="${tbl.id}"]`);
-          if (nameSpan) nameSpan.textContent = tbl.name;
-        }
-        $ptEdit.style.display = 'none'; _ptEditTd = null;
-        ptSnapshot(); ptScheduleSave();
-      } else {
-        ptCommitEdit();
-      }
+      if ($ptEdit.dataset.field === '__tableName__') ptCommitTableName();
+      else ptCommitEdit();
     }
   }, 80);
 });
@@ -6528,6 +6499,12 @@ document.getElementById('pt-btn-back-home').addEventListener('click', () => {
         tables: STB.tables, nextId: STB.nextId,
         linkedLmDiagramId: STB.linkedLmDiagramId || null, updatedAt: now
       }));
+      const list = loadListCache() || [];
+      const idx = list.findIndex(x => x.id === currentDiagramId);
+      const entry = { id: currentDiagramId, name, updatedAt: now, nodeCount: STB.tables.length, diagramType: 'physical', physicalStyle: 'table' };
+      if (idx >= 0) list[idx] = entry; else list.unshift(entry);
+      list.sort((a, b) => b.updatedAt - a.updatedAt);
+      localStorage.setItem(listKey(), JSON.stringify(list));
     } catch(e) {}
   }
   window.location.href = 'app.html';
@@ -6570,7 +6547,7 @@ function ptGenerateSQL(dialect) {
       const isPk = /\bPK\b/.test(row.constraints || '');
       const isNN = isPk || /\bNOT NULL\b/i.test(row.constraints || '') || /\bNN\b/.test(row.constraints || '');
       const typePart = adaptType(row.dataType || 'VARCHAR(255)', isPk);
-      let def = `  ${q(row.fieldName)}${row.fieldName ? '' : ''} ${typePart}`;
+      let def = `  ${q(row.fieldName)} ${typePart}`;
       if (isNN && !(dialect === 'postgresql' && typePart.startsWith('SERIAL'))) def += ' NOT NULL';
       if (row.notes) def += ` -- ${row.notes}`;
       cols.push(def);
