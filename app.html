@@ -1799,17 +1799,23 @@ function boot() {
         window._directOpenDone = true;
         const _openDirect = async () => {
           let diagData = loadDiagCache(directId);
-          try {
-            const snap = await getDoc(doc(db, 'users', user.uid, 'diagrams', directId));
-            if (snap.exists()) {
-              const fsData = snap.data();
-              const fsTs = fsData.updatedAt?.toMillis?.() ?? 0;
-              const localTs = diagData?.updatedAt ?? 0;
-              if (!diagData || localTs <= fsTs) {
-                diagData = { id: directId, ...fsData };
+          // Only fetch Firestore if local cache is missing or more than 15 s old.
+          // Skipping for fresh cache avoids a hang when the Firestore write of a
+          // just-created diagram hasn't been committed to IndexedDB yet.
+          const localAge = diagData?.updatedAt ? (Date.now() - diagData.updatedAt) : Infinity;
+          if (!diagData || localAge > 15000) {
+            try {
+              const snap = await getDoc(doc(db, 'users', user.uid, 'diagrams', directId));
+              if (snap.exists()) {
+                const fsData = snap.data();
+                const fsTs = fsData.updatedAt?.toMillis?.() ?? 0;
+                const localTs = diagData?.updatedAt ?? 0;
+                if (!diagData || localTs <= fsTs) {
+                  diagData = { id: directId, ...fsData };
+                }
               }
-            }
-          } catch(e) {}
+            } catch(e) {}
+          }
           if (!diagData) { show('home'); loadHome(); updateTrashBadge(); return; }
           if (directType === 'er') openDiagram(directId, diagData);
           else if (directType === 'logical') openLogicalDiagram(directId, diagData);
