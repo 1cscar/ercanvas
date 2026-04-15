@@ -4069,7 +4069,7 @@ function lmRenderTable(tbl) {
     }
     // Col hit rect
     const hit=mk('rect',{x:cx,y:0,width:cw,height:LM_COL_H,fill:'transparent'});
-    hit.style.cursor='pointer'; hit.dataset.colId=col.id; hit.dataset.tableId=tbl.id;
+    hit.style.cursor=isSelCol?'grab':'pointer'; hit.dataset.colId=col.id; hit.dataset.tableId=tbl.id;
     g.appendChild(hit);
   });
 
@@ -4336,37 +4336,40 @@ $lmSvg.addEventListener('mousedown', e => {
   $lmSvg.style.cursor='grabbing';
 });
 
-$lmSvg.addEventListener('mousemove', e => {
-  if (lmColDragging && !lmRcDrag) {
-    const pt=lmToSVG(e.clientX,e.clientY);
-    if (!lmColDragActive && Math.abs(pt.x-lmColDragging.startX)>5) {
-      lmColDragActive=true;
-      const ns='http://www.w3.org/2000/svg';
-      lmColDragIndicator=document.createElementNS(ns,'rect');
-      lmColDragIndicator.setAttribute('width','3'); lmColDragIndicator.setAttribute('rx','1');
-      lmColDragIndicator.setAttribute('height',String(LM_COL_H));
-      lmColDragIndicator.setAttribute('fill','#2563EB');
-      lmColDragIndicator.style.pointerEvents='none';
-      $lmTblL.appendChild(lmColDragIndicator);
-      $lmSvg.style.cursor='grabbing';
-      lmHideCbar();
-    }
-    if (lmColDragActive) {
-      const tbl=SL.tables.find(t=>t.id===lmColDragging.tableId);
-      if (tbl) {
-        const relX=pt.x-tbl.x;
-        let targetIdx=0;
-        for (let i=0;i<tbl.columns.length;i++) {
-          if (relX>lmColX(tbl,i)+lmColW(tbl.columns[i])/2) targetIdx=i+1;
-        }
-        lmColDragging.targetIdx=targetIdx;
-        const insertX=targetIdx<tbl.columns.length?lmColX(tbl,targetIdx):lmTblW(tbl);
-        lmColDragIndicator.setAttribute('x',String(tbl.x+insertX-1));
-        lmColDragIndicator.setAttribute('y',String(tbl.y));
-      }
-      e.preventDefault(); return;
-    }
+window.addEventListener('mousemove', e => {
+  if (!lmColDragging || lmRcDrag) return;
+  const pt=lmToSVG(e.clientX,e.clientY);
+  if (!lmColDragActive && Math.abs(pt.x-lmColDragging.startX)>4) {
+    lmColDragActive=true;
+    const ns='http://www.w3.org/2000/svg';
+    lmColDragIndicator=document.createElementNS(ns,'rect');
+    lmColDragIndicator.setAttribute('width','3'); lmColDragIndicator.setAttribute('rx','1');
+    lmColDragIndicator.setAttribute('height',String(LM_COL_H));
+    lmColDragIndicator.setAttribute('fill','#2563EB');
+    lmColDragIndicator.style.pointerEvents='none';
+    $lmTblL.appendChild(lmColDragIndicator);
+    $lmSvg.style.cursor='grabbing';
+    lmHideCbar();
   }
+  if (lmColDragActive) {
+    const tbl=SL.tables.find(t=>t.id===lmColDragging.tableId);
+    if (tbl) {
+      const relX=pt.x-tbl.x;
+      let targetIdx=0;
+      for (let i=0;i<tbl.columns.length;i++) {
+        if (relX>lmColX(tbl,i)+lmColW(tbl.columns[i])/2) targetIdx=i+1;
+      }
+      lmColDragging.targetIdx=targetIdx;
+      const insertX=targetIdx<tbl.columns.length?lmColX(tbl,targetIdx):lmTblW(tbl);
+      lmColDragIndicator.setAttribute('x',String(tbl.x+insertX-1));
+      lmColDragIndicator.setAttribute('y',String(tbl.y));
+    }
+    e.preventDefault();
+  }
+});
+
+$lmSvg.addEventListener('mousemove', e => {
+  if (lmColDragActive) return; // handled by window listener
   if (lmRcDrag) {
     const pt = lmToSVG(e.clientX, e.clientY);
     let x2 = pt.x, y2 = pt.y;
@@ -5430,7 +5433,7 @@ function pmRenderTable(tbl) {
     }
     // Hit area
     const hit=mk('rect',{x:0,y,width:PM_COL_W,height:PM_ROW_H,fill:'transparent'});
-    hit.style.cursor='pointer'; hit.dataset.colId=col.id; hit.dataset.tableId=tbl.id;
+    hit.style.cursor=isSelCol?'grab':'pointer'; hit.dataset.colId=col.id; hit.dataset.tableId=tbl.id;
     g.appendChild(hit);
   });
   pmTEls.set(tbl.id,g); $pmTblL.appendChild(g);
@@ -5592,37 +5595,40 @@ $pmSvg.addEventListener('dblclick', e => {
   if(colEl) pmOpenColEdit(colEl.dataset.tableId,colEl.dataset.colId);
 });
 
-$pmSvg.addEventListener('mousemove', e => {
-  if (pmColDragging && !pmRcDrag) {
-    const pt=pmToSVG(e.clientX,e.clientY);
-    if (!pmColDragActive && Math.abs(pt.y-pmColDragging.startY)>5) {
-      pmColDragActive=true;
-      const ns='http://www.w3.org/2000/svg';
-      pmColDragIndicator=document.createElementNS(ns,'rect');
-      pmColDragIndicator.setAttribute('width',String(PM_COL_W));
-      pmColDragIndicator.setAttribute('height','3'); pmColDragIndicator.setAttribute('rx','1');
-      pmColDragIndicator.setAttribute('fill','#2563EB');
-      pmColDragIndicator.style.pointerEvents='none';
-      $pmTblL.appendChild(pmColDragIndicator);
-      $pmSvg.style.cursor='grabbing';
-      pmHideCbar();
-    }
-    if (pmColDragActive) {
-      const tbl=SP.tables.find(t=>t.id===pmColDragging.tableId);
-      if (tbl) {
-        const dataY0=tbl.y+PM_HDR_H+PM_SUBHDR_H;
-        const relY=pt.y-dataY0;
-        let targetIdx=0;
-        for (let i=0;i<tbl.columns.length;i++) {
-          if (relY>i*PM_ROW_H+PM_ROW_H/2) targetIdx=i+1;
-        }
-        pmColDragging.targetIdx=targetIdx;
-        pmColDragIndicator.setAttribute('x',String(tbl.x));
-        pmColDragIndicator.setAttribute('y',String(dataY0+targetIdx*PM_ROW_H-1));
-      }
-      e.preventDefault(); return;
-    }
+window.addEventListener('mousemove', e => {
+  if (!pmColDragging || pmRcDrag) return;
+  const pt=pmToSVG(e.clientX,e.clientY);
+  if (!pmColDragActive && Math.abs(pt.y-pmColDragging.startY)>4) {
+    pmColDragActive=true;
+    const ns='http://www.w3.org/2000/svg';
+    pmColDragIndicator=document.createElementNS(ns,'rect');
+    pmColDragIndicator.setAttribute('width',String(PM_COL_W));
+    pmColDragIndicator.setAttribute('height','3'); pmColDragIndicator.setAttribute('rx','1');
+    pmColDragIndicator.setAttribute('fill','#2563EB');
+    pmColDragIndicator.style.pointerEvents='none';
+    $pmTblL.appendChild(pmColDragIndicator);
+    $pmSvg.style.cursor='grabbing';
+    pmHideCbar();
   }
+  if (pmColDragActive) {
+    const tbl=SP.tables.find(t=>t.id===pmColDragging.tableId);
+    if (tbl) {
+      const dataY0=tbl.y+PM_HDR_H+PM_SUBHDR_H;
+      const relY=pt.y-dataY0;
+      let targetIdx=0;
+      for (let i=0;i<tbl.columns.length;i++) {
+        if (relY>i*PM_ROW_H+PM_ROW_H/2) targetIdx=i+1;
+      }
+      pmColDragging.targetIdx=targetIdx;
+      pmColDragIndicator.setAttribute('x',String(tbl.x));
+      pmColDragIndicator.setAttribute('y',String(dataY0+targetIdx*PM_ROW_H-1));
+    }
+    e.preventDefault();
+  }
+});
+
+$pmSvg.addEventListener('mousemove', e => {
+  if (pmColDragActive) return; // handled by window listener
   if (pmRcDrag) {
     const pt = pmToSVG(e.clientX, e.clientY);
     let x2 = pt.x, y2 = pt.y;
