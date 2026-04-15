@@ -1636,7 +1636,7 @@ import { initializeApp }       from 'https://www.gstatic.com/firebasejs/11.6.0/f
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut }
                                from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-         doc, setDoc, getDoc, getDocs, addDoc, deleteDoc, updateDoc, onSnapshot,
+         doc, setDoc, getDoc, getDocs, getDocsFromServer, addDoc, deleteDoc, updateDoc, onSnapshot,
          collection, query, orderBy, serverTimestamp, deleteField }
                                from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js';
 import { getDatabase, ref as rref, set as rset, onValue, off as roff, remove as rremove }
@@ -1977,7 +1977,7 @@ async function loadHome() {
 
   // 背景從 Firestore 同步最新資料（不阻塞 UI）
   try {
-    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'diagrams'));
+    const snaps = await getDocsFromServer(collection(db, 'users', currentUser.uid, 'diagrams'));
     const pendingDeletes = getPendingDeletes();
     const docs = [];
     snaps.forEach(s => {
