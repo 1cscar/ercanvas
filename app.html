@@ -1910,6 +1910,7 @@ function saveListCache(docs) {
       updatedAt: data.updatedAt?.toMillis?.() ?? data.updatedAt ?? 0,
       nodeCount: (data.nodes||data.tables||[]).length,
       diagramType: data.diagramType || 'er',
+      physicalStyle: data.physicalStyle || null,
     }));
     localStorage.setItem(listKey(), JSON.stringify(lite));
   } catch(e) {}
@@ -1978,12 +1979,19 @@ async function loadHome() {
       const isPhysical = d.diagramType === 'physical';
       if (!isLogical && !isPhysical && !Array.isArray(d.nodes)) return;
       docs.push({ id: s.id, data: d });
-      if (isLogical) {
-        try { localStorage.setItem(diagKey(s.id), JSON.stringify({ id:s.id, diagramType:'logical', name:d.name, tables:d.tables||[], fkLinks:d.fkLinks||[], nextId:d.nextId||1, linkedErDiagramId:d.linkedErDiagramId||null, updatedAt:d.updatedAt?.toMillis?.()??0 })); } catch(e) {}
-      } else if (isPhysical) {
-        try { localStorage.setItem(diagKey(s.id), JSON.stringify({ id:s.id, diagramType:'physical', physicalStyle:d.physicalStyle||null, name:d.name, tables:d.tables||[], fkLinks:d.fkLinks||[], nextId:d.nextId||1, linkedLmDiagramId:d.linkedLmDiagramId||null, updatedAt:d.updatedAt?.toMillis?.()??0 })); } catch(e) {}
-      } else {
-        saveDiagCache(s.id, d.name, d.nodes, d.edges, d.nextId, d.updatedAt?.toMillis?.() ?? 0);
+      // Only overwrite localStorage if Firestore data is same age or newer.
+      // If local is newer it means a pending save hasn't flushed yet — don't roll it back.
+      const _fsTs = d.updatedAt?.toMillis?.() ?? 0;
+      const _local = loadDiagCache(s.id);
+      const _localTs = _local?.updatedAt ?? 0;
+      if (_localTs <= _fsTs) {
+        if (isLogical) {
+          try { localStorage.setItem(diagKey(s.id), JSON.stringify({ id:s.id, diagramType:'logical', name:d.name, tables:d.tables||[], fkLinks:d.fkLinks||[], nextId:d.nextId||1, linkedErDiagramId:d.linkedErDiagramId||null, updatedAt:_fsTs })); } catch(e) {}
+        } else if (isPhysical) {
+          try { localStorage.setItem(diagKey(s.id), JSON.stringify({ id:s.id, diagramType:'physical', physicalStyle:d.physicalStyle||null, name:d.name, tables:d.tables||[], fkLinks:d.fkLinks||[], nextId:d.nextId||1, linkedLmDiagramId:d.linkedLmDiagramId||null, updatedAt:_fsTs })); } catch(e) {}
+        } else {
+          saveDiagCache(s.id, d.name, d.nodes, d.edges, d.nextId, _fsTs);
+        }
       }
     });
     docs.sort((a, b) => (b.data.updatedAt?.toMillis?.() ?? 0) - (a.data.updatedAt?.toMillis?.() ?? 0));
