@@ -2003,6 +2003,24 @@ async function loadHome() {
         }
       }
     });
+    // ── 雙向同步：把本機有但 Firestore 沒有（或本機較新）的圖表推上去 ──
+    const fsIds = new Set(docs.map(d => d.id));
+    const localList = loadListCache() || [];
+    const pendingDeletesCheck = getPendingDeletes();
+    for (const entry of localList) {
+      if (pendingDeletesCheck.has(entry.id)) continue;
+      const localData = loadDiagCache(entry.id);
+      if (!localData) continue;
+      const localTs = localData.updatedAt ?? 0;
+      const fsDoc = docs.find(d => d.id === entry.id);
+      const fsTs = fsDoc ? (fsDoc.data.updatedAt?.toMillis?.() ?? 0) : 0;
+      if (!fsIds.has(entry.id) || localTs > fsTs) {
+        // Local has data Firestore doesn't know about — push it up
+        const payload = { ...localData, updatedAt: serverTimestamp() };
+        delete payload.id;
+        setDoc(doc(db, 'users', currentUser.uid, 'diagrams', entry.id), payload).catch(() => {});
+      }
+    }
     docs.sort((a, b) => (b.data.updatedAt?.toMillis?.() ?? 0) - (a.data.updatedAt?.toMillis?.() ?? 0));
     saveListCache(docs);
     // Firestore 已回應，隱藏 loading（不論有無快取）
