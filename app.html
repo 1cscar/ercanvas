@@ -1799,11 +1799,13 @@ function boot() {
         window._directOpenDone = true;
         const _openDirect = async () => {
           let diagData = loadDiagCache(directId);
-          // Only fetch Firestore if local cache is missing or more than 15 s old.
-          // Skipping for fresh cache avoids a hang when the Firestore write of a
-          // just-created diagram hasn't been committed to IndexedDB yet.
-          const localAge = diagData?.updatedAt ? (Date.now() - diagData.updatedAt) : Infinity;
-          if (!diagData || localAge > 15000) {
+          // Skip Firestore fetch only when this is a diagram we just created on
+          // this tab (setDoc is background, IndexedDB may not be ready yet).
+          // For all other cases always pull Firestore so cross-device edits show up.
+          const _isNewDiag = (() => { try { return sessionStorage.getItem('er_new_diag') === directId; } catch(e) { return false; } })();
+          if (_isNewDiag) {
+            try { sessionStorage.removeItem('er_new_diag'); } catch(e) {}
+          } else {
             try {
               const snap = await getDoc(doc(db, 'users', user.uid, 'diagrams', directId));
               if (snap.exists()) {
@@ -2349,6 +2351,7 @@ document.getElementById('btn-new-diagram').addEventListener('click', async () =>
     // 背景寫入 Firestore
     setDoc(newRef, { ...newData, updatedAt: serverTimestamp() })
       .catch(e => console.error('新增圖表寫入失敗:', e));
+    try { sessionStorage.setItem('er_new_diag', newRef.id); } catch(e) {}
     window.location.href = `app.html?id=${encodeURIComponent(newRef.id)}&type=er`;
   } catch(e) {
     console.error('新增圖表失敗:', e);
@@ -2371,6 +2374,7 @@ document.getElementById('btn-new-logical').addEventListener('click', async () =>
       localStorage.setItem(listKey(), JSON.stringify(list));
     } catch(e) {}
     setDoc(newRef, { ...newData, updatedAt: serverTimestamp() }).catch(e => console.error(e));
+    try { sessionStorage.setItem('er_new_diag', newRef.id); } catch(e) {}
     window.location.href = `app.html?id=${encodeURIComponent(newRef.id)}&type=logical`;
   } catch(e) { alert('新增失敗，請重試'); btn.disabled = false; }
 });
@@ -2389,6 +2393,7 @@ document.getElementById('btn-new-physical').addEventListener('click', async () =
       localStorage.setItem(listKey(), JSON.stringify(list));
     } catch(e) {}
     setDoc(doc(db, 'users', currentUser.uid, 'diagrams', newRef.id), { ...newData, updatedAt: serverTimestamp() }).catch(e => console.error(e));
+    try { sessionStorage.setItem('er_new_diag', newRef.id); } catch(e) {}
     window.location.href = `app.html?id=${encodeURIComponent(newRef.id)}&type=physical`;
   } catch(e) { console.error(e); btn.disabled = false; }
 });
