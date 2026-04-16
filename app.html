@@ -2291,18 +2291,29 @@ function boot() {
         if (window._directOpenDone) return;
         window._directOpenDone = true;
         const _openDirect = async () => {
+          let openedData = null;
           try {
-            showDirectSkeleton(directType);
+            window._openHasLocalChanges = false;
+            const prefetched = loadDirectPrefetch(directId, user.uid);
+            if (prefetched && supportsDirectType(directType, prefetched)) {
+              openDiagramByType(directId, directType, prefetched, fromNormalize, lmId);
+              openedData = prefetched;
+            } else {
+              showDirectSkeleton(directType);
+            }
             const diagData = await fetchCanvas(directId, user.uid);
             if (!diagData) { setOpenLoading(false); show('home'); loadHome(); updateTrashBadge(); return; }
-            if (directType === 'er') openDiagram(directId, diagData);
-            else if (directType === 'logical') openLogicalDiagram(directId, diagData);
-            else if (directType === 'physical') {
-              if (diagData.physicalStyle === 'table') {
-                openPhysicalTableDiagram(directId, diagData, fromNormalize, lmId);
-              } else {
-                openPhysicalDiagram(directId, diagData);
-              }
+            saveDirectPrefetch(directId, diagData, user.uid);
+            const openedTs = toMillisSafe(openedData?.updatedAtMs ?? openedData?.updatedAt);
+            const latestTs = toMillisSafe(diagData.updatedAt);
+            const canApplyRemote = !window._openHasLocalChanges;
+            const noTsButDifferentShape = !latestTs && !openedTs && (
+              ((diagData.nodes?.length || 0) !== (openedData?.nodes?.length || 0)) ||
+              ((diagData.edges?.length || 0) !== (openedData?.edges?.length || 0)) ||
+              ((diagData.tables?.length || 0) !== (openedData?.tables?.length || 0))
+            );
+            if (!openedData || (canApplyRemote && (latestTs > openedTs || noTsButDifferentShape))) {
+              openDiagramByType(directId, directType, diagData, fromNormalize, lmId);
             }
           } catch (e) {
             console.error('direct open failed:', e);
@@ -2372,6 +2383,70 @@ function removePendingDelete(id) {
   try { localStorage.setItem(pendingDelKey(), JSON.stringify([...pending])); } catch(e) {}
 }
 
+const DIRECT_PREFETCH_TTL_MS = 10 * 60 * 1000;
+function directPrefetchKey(uid, id) {
+  return `er_direct_prefetch_${uid}_${id}`;
+}
+function toMillisSafe(ts) {
+  if (!ts) return 0;
+  if (typeof ts === 'number') return ts;
+  if (typeof ts.toMillis === 'function') return ts.toMillis();
+  return 0;
+}
+function supportsDirectType(directType, data) {
+  const dt = data?.diagramType || 'er';
+  if (directType === 'logical') return dt === 'logical';
+  if (directType === 'physical') return dt === 'physical';
+  return dt !== 'logical' && dt !== 'physical';
+}
+function toPrefetchPayload(id, data) {
+  if (!id || !data) return null;
+  const payload = {
+    id,
+    name: data.name || '',
+    diagramType: data.diagramType || 'er',
+    physicalStyle: data.physicalStyle || null,
+    nextId: data.nextId || 1,
+    linkedErDiagramId: data.linkedErDiagramId || null,
+    linkedLmDiagramId: data.linkedLmDiagramId || null,
+    nodes: Array.isArray(data.nodes) ? data.nodes : undefined,
+    edges: Array.isArray(data.edges) ? data.edges : undefined,
+    tables: Array.isArray(data.tables) ? data.tables : undefined,
+    fkLinks: Array.isArray(data.fkLinks) ? data.fkLinks : undefined,
+    updatedAtMs: toMillisSafe(data.updatedAt),
+    cachedAtMs: Date.now(),
+  };
+  try { return JSON.parse(JSON.stringify(payload)); }
+  catch(_) { return null; }
+}
+function saveDirectPrefetch(id, data, uid = currentUser?.uid) {
+  if (!uid) return;
+  const payload = toPrefetchPayload(id, data);
+  if (!payload) return;
+  try { sessionStorage.setItem(directPrefetchKey(uid, id), JSON.stringify(payload)); } catch(_) {}
+}
+function loadDirectPrefetch(id, uid = currentUser?.uid) {
+  if (!uid || !id) return null;
+  try {
+    const raw = sessionStorage.getItem(directPrefetchKey(uid, id));
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || (Date.now() - (data.cachedAtMs || 0) > DIRECT_PREFETCH_TTL_MS)) return null;
+    return data;
+  } catch(_) {
+    return null;
+  }
+}
+function openDiagramByType(id, directType, diagData, fromNormalize, lmId) {
+  if (!diagData) return;
+  if (directType === 'er') openDiagram(id, diagData);
+  else if (directType === 'logical') openLogicalDiagram(id, diagData);
+  else if (directType === 'physical') {
+    if (diagData.physicalStyle === 'table') openPhysicalTableDiagram(id, diagData, fromNormalize, lmId);
+    else openPhysicalDiagram(id, diagData);
+  }
+}
+
 // Server-first home loading placeholder
 function loadHomeFast() {
   const grid = document.getElementById('home-grid');
@@ -2408,6 +2483,7 @@ function loadHome() {
         const isPhysical = d.diagramType === 'physical';
         if (!isLogical && !isPhysical && !Array.isArray(d.nodes)) return;
         docs.push({ id: s.id, data: d });
+        saveDirectPrefetch(s.id, d, currentUser?.uid);
       });
 
       // 快速顯示快取資料；若快取是空且伺服器尚未回來，保持 loading。
@@ -2494,6 +2570,7 @@ function renderDiagramCard(id, data) {
   card.appendChild(footer);
 
   card.addEventListener('click', () => {
+    saveDirectPrefetch(id, data, currentUser?.uid);
     if (data.isShared) {
       window.location.href = `app.html?share=${id}`;
       return;
@@ -2570,6 +2647,7 @@ function buildLogicalPreviewSVG(tables) {
 
 async function openDiagram(id, data) {
   setOpenLoading(false);
+  window._openHasLocalChanges = false;
   stopAllListeners();
   _currentOwnerUid = currentUser.uid;
   _viewerMode = false;
@@ -2769,6 +2847,7 @@ document.getElementById('btn-new-physical').addEventListener('click', async () =
 function scheduleSave() {
   if (!window._diagramFullyLoaded) return;
   if (!currentDiagramId || _viewerMode) return;
+  window._openHasLocalChanges = true;
   const name = document.getElementById('diagram-name').value;
   document.getElementById('save-status').textContent = '未儲存…';
   // 1. 立即廣播到 RTDB（150ms throttle，所有協作者立即看到）
@@ -5605,6 +5684,7 @@ document.getElementById('lm-btn-redo').addEventListener('click',lmRedo);
 function lmScheduleSave() {
   if (!window._diagramFullyLoaded) return;
   if(!currentDiagramId) return;
+  window._openHasLocalChanges = true;
   const name=document.getElementById('lm-diagram-name').value;
   document.getElementById('lm-save-status').textContent='未儲存…';
 
@@ -5664,6 +5744,7 @@ function startLmDiagListener(diagId) {
 // ── Open logical diagram ──────────────────────────────────────────────────────
 function openLogicalDiagram(id, data) {
   setOpenLoading(false);
+  window._openHasLocalChanges = false;
   stopAllListeners();
   currentDiagramId=id;
   const src=data||{};
@@ -6405,6 +6486,9 @@ function pmPlaceTable(x,y) {
 
 // ── Save ──────────────────────────────────────────────────────────────────────
 function pmScheduleSave() {
+  if (!window._diagramFullyLoaded) return;
+  if (!currentDiagramId) return;
+  window._openHasLocalChanges = true;
   const name=document.getElementById('pm-diagram-name').value||'未命名實體模型';
   document.getElementById('pm-save-status').textContent='儲存中…';
   autoSave('pm', async () => {
@@ -6751,6 +6835,7 @@ document.getElementById('pm-sql-download').addEventListener('click', () => {
 // ── Open physical diagram ─────────────────────────────────────────────────────
 function openPhysicalDiagram(id, data) {
   setOpenLoading(false);
+  window._openHasLocalChanges = false;
   const src = data || {};
   if (src.physicalStyle === 'table') {
     openPhysicalTableDiagram(id, src, false, null);
@@ -7408,6 +7493,7 @@ document.addEventListener('keydown', e => {
 function ptScheduleSave() {
   if (!window._diagramFullyLoaded) return;
   if (!currentDiagramId) return;
+  window._openHasLocalChanges = true;
   const name = document.getElementById('pt-diagram-name').value;
   document.getElementById('pt-save-status').textContent = '未儲存…';
   autoSave('pt', async () => {
@@ -7518,6 +7604,7 @@ document.getElementById('pt-sql-download').addEventListener('click', () => {
 // ── Open physical table diagram ───────────────────────────────────────────────
 function openPhysicalTableDiagram(id, data, fromNormalize, lmId) {
   setOpenLoading(false);
+  window._openHasLocalChanges = false;
   stopAllListeners();
   currentDiagramId = id;
   const src = data || {};
