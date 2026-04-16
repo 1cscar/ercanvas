@@ -1739,9 +1739,13 @@ async function fetchCanvas(projectId, ownerUid = currentUser?.uid) {
   ]);
   if (fastResult) return fastResult;
 
-  const serverResult = await fromServer;
-  if (serverResult) return serverResult;
-  return await fromCacheOrNetwork;
+  // After quick path timeout, use whichever source resolves first.
+  // This avoids being blocked on getDocFromServer when cache/network already has data.
+  const firstSettled = await Promise.race([fromServer, fromCacheOrNetwork]);
+  if (firstSettled) return firstSettled;
+
+  const [serverResult, cacheResult] = await Promise.all([fromServer, fromCacheOrNetwork]);
+  return serverResult || cacheResult || null;
 }
 
 const CURSOR_COLORS = ['#f43f5e','#f97316','#eab308','#22c55e','#06b6d4','#8b5cf6','#ec4899'];
