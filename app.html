@@ -1653,7 +1653,7 @@ const FIREBASE_CONFIG = {
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let app, auth, db, rtdb, currentUser, saveTimer, currentDiagramId = null;
+let app, auth, db, rtdb, currentUser, currentDiagramId = null;
 let _currentOwnerUid = null;
 let _diagListener    = null;
 let _presListener    = null;
@@ -1663,7 +1663,73 @@ let _rtdbSyncTimer   = null;   // throttle for RTDB live write (ER)
 let _lmRtdbTimer     = null;   // throttle for RTDB live write (logical)
 let _homeListener    = null;
 let _homeRenderSig   = '';
-const SERVER_SAVE_DEBOUNCE_MS = 100;
+const PROJECTS_COLLECTION = 'projects';
+const AUTO_SAVE_DEBOUNCE_MS = 2000;
+const _autoSaveTimers = new Map();
+
+function projectCollectionRef(uid = currentUser?.uid) {
+  return collection(db, 'users', uid, PROJECTS_COLLECTION);
+}
+function projectDocRef(uid, projectId) {
+  return doc(db, 'users', uid, PROJECTS_COLLECTION, projectId);
+}
+
+function autoSave(slot, job, delay = AUTO_SAVE_DEBOUNCE_MS) {
+  const prev = _autoSaveTimers.get(slot);
+  if (prev) clearTimeout(prev);
+  const timer = setTimeout(async () => {
+    try { await job(); }
+    finally { _autoSaveTimers.delete(slot); }
+  }, delay);
+  _autoSaveTimers.set(slot, timer);
+}
+function cancelAutoSave(slot) {
+  const timer = _autoSaveTimers.get(slot);
+  if (timer) clearTimeout(timer);
+  _autoSaveTimers.delete(slot);
+}
+
+function initFirebaseModule() {
+  app  = initializeApp(FIREBASE_CONFIG);
+  auth = getAuth(app);
+  db   = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  });
+  rtdb = getDatabase(app, 'https://remodel-d9545-default-rtdb.asia-southeast1.firebasedatabase.app');
+  return { app, auth, db, rtdb };
+}
+
+async function loginWithGoogle() {
+  const cred = await signInWithPopup(auth, new GoogleAuthProvider());
+  return cred.user.uid;
+}
+
+function watchAuthState(handler) {
+  return onAuthStateChanged(auth, handler);
+}
+
+async function saveCanvas(data, projectId = currentDiagramId, ownerUid = _currentOwnerUid || auth.currentUser?.uid) {
+  if (!auth.currentUser) {
+    alert('請先登入 Google 帳號');
+    throw new Error('AUTH_REQUIRED');
+  }
+  if (!projectId) throw new Error('PROJECT_ID_REQUIRED');
+  if (!ownerUid) throw new Error('OWNER_UID_REQUIRED');
+  await setDoc(projectDocRef(ownerUid, projectId), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+async function fetchCanvas(projectId, ownerUid = currentUser?.uid) {
+  if (!projectId || !ownerUid) return null;
+  try {
+    const snap = await getDocFromServer(projectDocRef(ownerUid, projectId));
+    if (snap.exists()) return { id: projectId, ...snap.data() };
+  } catch(_) {}
+  const fallback = await getDoc(projectDocRef(ownerUid, projectId));
+  return fallback.exists() ? { id: projectId, ...fallback.data() } : null;
+}
 
 const CURSOR_COLORS = ['#f43f5e','#f97316','#eab308','#22c55e','#06b6d4','#8b5cf6','#ec4899'];
 function _userColor(uid) {
@@ -1775,14 +1841,9 @@ function applyUserUI(user) {
 
 function boot() {
   try {
-    app  = initializeApp(FIREBASE_CONFIG);
-    auth = getAuth(app);
-    db   = initializeFirestore(app, {
-      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-    });
-    rtdb = getDatabase(app, 'https://remodel-d9545-default-rtdb.asia-southeast1.firebasedatabase.app');
+    initFirebaseModule();
   } catch(e) { show('setup'); return; }
-  onAuthStateChanged(auth, user => {
+  watchAuthState(user => {
     if (user) {
       currentUser = user;
       // Persist session for next cold start
@@ -1801,16 +1862,7 @@ function boot() {
         if (window._directOpenDone) return;
         window._directOpenDone = true;
         const _openDirect = async () => {
-          let diagData = null;
-          try {
-            const snap = await getDocFromServer(doc(db, 'users', user.uid, 'diagrams', directId));
-            if (snap.exists()) diagData = { id: directId, ...snap.data() };
-          } catch(e) {
-            try {
-              const snap = await getDoc(doc(db, 'users', user.uid, 'diagrams', directId));
-              if (snap.exists()) diagData = { id: directId, ...snap.data() };
-            } catch(_) {}
-          }
+          const diagData = await fetchCanvas(directId, user.uid);
           if (!diagData) { show('home'); loadHome(); updateTrashBadge(); return; }
           if (directType === 'er') openDiagram(directId, diagData);
           else if (directType === 'logical') openLogicalDiagram(directId, diagData);
@@ -1850,7 +1902,7 @@ document.getElementById('btn-google-login').addEventListener('click', async () =
   const btn = document.getElementById('btn-google-login');
   const err = document.getElementById('login-err');
   btn.disabled = true; btn.textContent = '登入中…';
-  try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+  try { await loginWithGoogle(); }
   catch(e) {
     err.textContent = e.code === 'auth/popup-blocked' ? '請允許彈出視窗後重試' : e.message;
     err.classList.remove('hidden');
@@ -1903,7 +1955,7 @@ function loadHome() {
   const pendingDeletes = getPendingDeletes();
 
   _homeListener = onSnapshot(
-    collection(db, 'users', currentUser.uid, 'diagrams'),
+    projectCollectionRef(currentUser.uid),
     { includeMetadataChanges: true },
     (snaps) => {
       if (snaps.metadata.fromCache) return;
@@ -2104,7 +2156,7 @@ let _permDeleteTarget = null; // { id, name }
 async function moveDiagramToTrash(id) {
   addPendingDelete(id);
   try {
-    await updateDoc(doc(db, 'users', currentUser.uid, 'diagrams', id), { deletedAt: serverTimestamp() });
+    await updateDoc(doc(db, 'users', currentUser.uid, 'projects', id), { deletedAt: serverTimestamp() });
     removePendingDelete(id);
     updateTrashBadge();
   } catch(e) { console.error('移至垃圾桶失敗:', e); }
@@ -2112,7 +2164,7 @@ async function moveDiagramToTrash(id) {
 
 async function updateTrashBadge() {
   try {
-    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'diagrams'));
+    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'projects'));
     let count = 0;
     snaps.forEach(s => { if (s.data().deletedAt) count++; });
     const badge = document.getElementById('trash-count-badge');
@@ -2126,7 +2178,7 @@ async function loadTrash() {
   const empty = document.getElementById('trash-empty');
   grid.innerHTML = '';
   try {
-    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'diagrams'));
+    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'projects'));
     const trashed = [];
     snaps.forEach(s => { if (s.data().deletedAt) trashed.push({ id: s.id, data: s.data() }); });
     if (!trashed.length) { empty.style.display = 'flex'; return; }
@@ -2168,7 +2220,7 @@ function renderTrashCard(id, data) {
 
 async function restoreDiagram(id) {
   try {
-    await updateDoc(doc(db, 'users', currentUser.uid, 'diagrams', id), { deletedAt: deleteField() });
+    await updateDoc(doc(db, 'users', currentUser.uid, 'projects', id), { deletedAt: deleteField() });
     document.querySelector(`#trash-grid [data-id="${id}"]`)?.remove();
     if (!document.getElementById('trash-grid').children.length)
       document.getElementById('trash-empty').style.display = 'flex';
@@ -2178,7 +2230,7 @@ async function restoreDiagram(id) {
 
 async function permanentDeleteDiagram(id) {
   try {
-    await deleteDoc(doc(db, 'users', currentUser.uid, 'diagrams', id));
+    await deleteDoc(doc(db, 'users', currentUser.uid, 'projects', id));
     document.querySelector(`#trash-grid [data-id="${id}"]`)?.remove();
     if (!document.getElementById('trash-grid').children.length)
       document.getElementById('trash-empty').style.display = 'flex';
@@ -2236,7 +2288,7 @@ document.getElementById('btn-new-diagram').addEventListener('click', async () =>
   const btn = document.getElementById('btn-new-diagram');
   btn.disabled = true;
   try {
-    const newRef = doc(collection(db, 'users', currentUser.uid, 'diagrams'));
+    const newRef = doc(projectCollectionRef(currentUser.uid));
     const newData = { name:'未命名圖表', nodes:[], edges:[], nextId:1, updatedAt: serverTimestamp() };
     await setDoc(newRef, newData);
     window.location.href = `app.html?id=${encodeURIComponent(newRef.id)}&type=er`;
@@ -2251,7 +2303,7 @@ document.getElementById('btn-new-logical').addEventListener('click', async () =>
   const btn = document.getElementById('btn-new-logical');
   btn.disabled = true;
   try {
-    const newRef = doc(collection(db, 'users', currentUser.uid, 'diagrams'));
+    const newRef = doc(projectCollectionRef(currentUser.uid));
     const newData = { diagramType:'logical', name:'未命名邏輯模型', tables:[], fkLinks:[], nextId:1, linkedErDiagramId:null, updatedAt: serverTimestamp() };
     await setDoc(newRef, newData);
     window.location.href = `app.html?id=${encodeURIComponent(newRef.id)}&type=logical`;
@@ -2262,9 +2314,9 @@ document.getElementById('btn-new-physical').addEventListener('click', async () =
   const btn = document.getElementById('btn-new-physical');
   btn.disabled = true;
   try {
-    const newRef = doc(collection(db, 'users', currentUser.uid, 'diagrams'));
+    const newRef = doc(projectCollectionRef(currentUser.uid));
     const newData = { diagramType:'physical', name:'未命名實體模型', tables:[], fkLinks:[], nextId:1, linkedLmDiagramId:null, updatedAt: serverTimestamp() };
-    await setDoc(doc(db, 'users', currentUser.uid, 'diagrams', newRef.id), newData);
+    await setDoc(projectDocRef(currentUser.uid, newRef.id), newData);
     window.location.href = `app.html?id=${encodeURIComponent(newRef.id)}&type=physical`;
   } catch(e) { console.error(e); btn.disabled = false; }
 });
@@ -2286,19 +2338,17 @@ function scheduleSave() {
     }, 150);
   }
 
-  // 2. 背景同步 Firestore（100ms debounce）
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(async () => {
+  // 2. 背景同步 Firestore（Debounce）
+  autoSave('er', async () => {
     try {
       _lastOwnSaveTs = Date.now();
       const ownerUid = _currentOwnerUid || currentUser.uid;
-      await setDoc(doc(db, 'users', ownerUid, 'diagrams', currentDiagramId), {
+      await saveCanvas({
         name, nodes: S.nodes, edges: S.edges, nextId: S.nextId,
-        updatedAt: serverTimestamp(),
-      });
+      }, currentDiagramId, ownerUid);
       document.getElementById('save-status').textContent = '已儲存';
     } catch(e) { document.getElementById('save-status').textContent = '儲存失敗'; }
-  }, SERVER_SAVE_DEBOUNCE_MS);
+  }, AUTO_SAVE_DEBOUNCE_MS);
 }
 document.getElementById('diagram-name').addEventListener('input', scheduleSave);
 
@@ -3567,7 +3617,7 @@ document.getElementById('tb-underline').addEventListener('click', () => {
 
 // Save now
 document.getElementById('btn-save-now').addEventListener('click', () => {
-  clearTimeout(saveTimer); saveTimer = null;
+  cancelAutoSave('er');
   scheduleSave();
   document.getElementById('save-status').textContent = '儲存中…';
 });
@@ -3715,7 +3765,7 @@ document.getElementById('btn-share').addEventListener('click', () => {
 
   // Load diagram from owner's collection
   try {
-    diagSnap = await getDoc(doc(db, 'users', shareData.ownerUid, 'diagrams', sharedDiagId));
+    diagSnap = await getDoc(doc(db, 'users', shareData.ownerUid, 'projects', sharedDiagId));
   } catch(e) { alert('無法載入圖表'); return; }
   if (!diagSnap.exists()) { alert('圖表不存在'); return; }
 
@@ -4919,7 +4969,7 @@ document.getElementById('lm-btn-redo').addEventListener('click',lmRedo);
     const btn = document.getElementById('lm-btn-normalize');
     btn.disabled = true;
     try {
-      const newRef = doc(collection(db, 'users', currentUser.uid, 'diagrams'));
+      const newRef = doc(collection(db, 'users', currentUser.uid, 'projects'));
       const lmName = document.getElementById('lm-diagram-name').value || '未命名邏輯模型';
       const newData = {
         diagramType: 'physical', physicalStyle: 'table',
@@ -4939,7 +4989,6 @@ document.getElementById('lm-btn-redo').addEventListener('click',lmRedo);
 })();
 
 // ── Save ──────────────────────────────────────────────────────────────────────
-let lmSaveTimer=null;
 function lmScheduleSave() {
   if (!window._diagramFullyLoaded) return;
   if(!currentDiagramId) return;
@@ -4957,21 +5006,20 @@ function lmScheduleSave() {
     }, 150);
   }
 
-  // 2. 背景同步 Firestore（100ms debounce）
-  clearTimeout(lmSaveTimer);
-  lmSaveTimer=setTimeout(async()=>{
+  // 2. 背景同步 Firestore（Debounce）
+  autoSave('lm', async () => {
     try {
-      await setDoc(doc(db,'users',currentUser.uid,'diagrams',currentDiagramId),{
+      await saveCanvas({
         diagramType:'logical', name,
         tables:SL.tables, fkLinks:SL.fkLinks, nextId:SL.nextId,
-        linkedErDiagramId:SL.linkedErDiagramId||null, updatedAt:serverTimestamp(),
-      });
+        linkedErDiagramId:SL.linkedErDiagramId||null,
+      }, currentDiagramId, currentUser.uid);
       document.getElementById('lm-save-status').textContent='已儲存';
     } catch(e){ document.getElementById('lm-save-status').textContent='儲存失敗'; }
-  }, SERVER_SAVE_DEBOUNCE_MS);
+  }, AUTO_SAVE_DEBOUNCE_MS);
 }
 document.getElementById('lm-diagram-name').addEventListener('input',lmScheduleSave);
-document.getElementById('lm-btn-save-now').addEventListener('click',()=>{ clearTimeout(lmSaveTimer); lmSaveTimer=null; lmScheduleSave(); });
+document.getElementById('lm-btn-save-now').addEventListener('click',()=>{ cancelAutoSave('lm'); lmScheduleSave(); });
 
 // ── RTDB listener for logical diagrams ───────────────────────────────────────
 function startLmDiagListener(diagId) {
@@ -5022,15 +5070,14 @@ function openLogicalDiagram(id, data) {
 
 // ── Back to Home ──────────────────────────────────────────────────────────────
 document.getElementById('lm-btn-back-home').addEventListener('click',()=>{
-  stopAllListeners(); clearTimeout(lmSaveTimer); lmSaveTimer=null;
+  stopAllListeners(); cancelAutoSave('lm');
   if(currentDiagramId){
     const name=document.getElementById('lm-diagram-name').value;
     // Flush Firestore immediately (replaces the cancelled debounce)
-    setDoc(doc(db,'users',currentUser.uid,'diagrams',currentDiagramId),{
+    saveCanvas({
       diagramType:'logical',name,tables:SL.tables,fkLinks:SL.fkLinks,
       nextId:SL.nextId,linkedErDiagramId:SL.linkedErDiagramId||null,
-      updatedAt:serverTimestamp(),
-    }).catch(()=>{});
+    }, currentDiagramId, currentUser.uid).catch(()=>{});
   }
   show('home'); loadHome();
 });
@@ -5044,7 +5091,7 @@ document.getElementById('lm-btn-link-er').addEventListener('click', async()=>{
   document.getElementById('lm-bind-status').textContent='';
   modal.style.display='flex';
   try {
-    const snaps=await getDocs(collection(db,'users',currentUser.uid,'diagrams'));
+    const snaps=await getDocs(collection(db,'users',currentUser.uid,'projects'));
     const ers=[];
     snaps.forEach(s=>{ const d=s.data(); if(!d.diagramType||d.diagramType==='er') ers.push({id:s.id,name:d.name||'未命名 ER 圖'}); });
     listEl.innerHTML='';
@@ -5083,7 +5130,7 @@ document.getElementById('lm-btn-convert').addEventListener('click', async()=>{
   if(!SL.linkedErDiagramId){ alert('請先連結 ER 圖'); return; }
   if(!confirm('從連結的 ER 圖產生表格（Entities→Tables，Attributes→Columns）。現有表格保留，新增不重複的。繼續？')) return;
   try {
-    const snap=await getDoc(doc(db,'users',currentUser.uid,'diagrams',SL.linkedErDiagramId));
+    const snap=await getDoc(doc(db,'users',currentUser.uid,'projects',SL.linkedErDiagramId));
     if(!snap.exists()){ alert('找不到連結的 ER 圖'); return; }
     const erData=snap.data(), nodes=erData.nodes||[], edges=erData.edges||[];
     const neighborSet = nodeId => new Set(edges.filter(e=>e.from===nodeId||e.to===nodeId).map(e=>e.from===nodeId?e.to:e.from));
@@ -5643,14 +5690,20 @@ function pmPlaceTable(x,y) {
 }
 
 // ── Save ──────────────────────────────────────────────────────────────────────
-let pmSaveTimer=null;
 function pmScheduleSave() {
   const name=document.getElementById('pm-diagram-name').value||'未命名實體模型';
   document.getElementById('pm-save-status').textContent='儲存中…';
-  clearTimeout(pmSaveTimer);
-  pmSaveTimer=setTimeout(async()=>{
-    try{await setDoc(doc(db,'users',currentUser.uid,'diagrams',currentDiagramId),{diagramType:'physical',name,tables:SP.tables,fkLinks:SP.fkLinks,nextId:SP.nextId,linkedLmDiagramId:SP.linkedLmDiagramId||null,updatedAt:serverTimestamp()});document.getElementById('pm-save-status').textContent='已儲存';}catch(e){document.getElementById('pm-save-status').textContent='儲存失敗';}
-  }, SERVER_SAVE_DEBOUNCE_MS);
+  autoSave('pm', async () => {
+    try {
+      await saveCanvas({
+        diagramType:'physical', name, tables:SP.tables, fkLinks:SP.fkLinks,
+        nextId:SP.nextId, linkedLmDiagramId:SP.linkedLmDiagramId||null
+      }, currentDiagramId, currentUser.uid);
+      document.getElementById('pm-save-status').textContent='已儲存';
+    } catch(e) {
+      document.getElementById('pm-save-status').textContent='儲存失敗';
+    }
+  }, AUTO_SAVE_DEBOUNCE_MS);
 }
 document.getElementById('pm-diagram-name').addEventListener('input',pmScheduleSave);
 
@@ -5784,7 +5837,7 @@ document.getElementById('pm-btn-link-lm').addEventListener('click', async ()=>{
   list.innerHTML='<p style="font-size:12px;color:#9ca3af;text-align:center;padding:16px;">載入中…</p>';
   document.getElementById('pm-bind-status').textContent=SP.linkedLmDiagramId?'已連結邏輯模型':'未連結';
   try {
-    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'diagrams'));
+    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'projects'));
     const lmDiags = [];
     snaps.forEach(s => {
       const d = s.data();
@@ -5830,8 +5883,8 @@ document.getElementById('pm-btn-import').addEventListener('click',async()=>{
   if(!confirm('從連結的邏輯模型產生表格（現有表格保留，新增不重複的）。繼續？'))return;
   try {
     let snap = null;
-    try { snap = await getDocFromServer(doc(db,'users',currentUser.uid,'diagrams',SP.linkedLmDiagramId)); }
-    catch(_) { snap = await getDoc(doc(db,'users',currentUser.uid,'diagrams',SP.linkedLmDiagramId)); }
+    try { snap = await getDocFromServer(doc(db,'users',currentUser.uid,'projects',SP.linkedLmDiagramId)); }
+    catch(_) { snap = await getDoc(doc(db,'users',currentUser.uid,'projects',SP.linkedLmDiagramId)); }
     const lmData = snap.exists() ? snap.data() : null;
     if(!lmData||lmData.diagramType!=='logical'){alert('找不到連結的邏輯模型');return;}
     const newTbls=[];
@@ -6004,14 +6057,13 @@ function openPhysicalDiagram(id, data) {
 
 // ── Back to Home ──────────────────────────────────────────────────────────────
 document.getElementById('pm-btn-back-home').addEventListener('click',()=>{
-  stopAllListeners();clearTimeout(pmSaveTimer);pmSaveTimer=null;
+  stopAllListeners(); cancelAutoSave('pm');
   const name=document.getElementById('pm-diagram-name').value;
   // Flush Firestore immediately (replaces the cancelled debounce)
-  setDoc(doc(db,'users',currentUser.uid,'diagrams',currentDiagramId),{
+  saveCanvas({
     diagramType:'physical',name,tables:SP.tables,fkLinks:SP.fkLinks,
     nextId:SP.nextId,linkedLmDiagramId:SP.linkedLmDiagramId||null,
-    updatedAt:serverTimestamp(),
-  }).catch(()=>{});
+  }, currentDiagramId, currentUser.uid).catch(()=>{});
   show('home');loadHome();
 });
 document.getElementById('pm-btn-logout').addEventListener('click',()=>signOut(auth).then(()=>show('login')));
@@ -6129,13 +6181,11 @@ window.addEventListener('beforeunload', () => {
 
 document.getElementById('btn-back-home').addEventListener('click', () => {
   stopAllListeners();
-  clearTimeout(saveTimer); saveTimer = null;
+  cancelAutoSave('er');
   if (currentDiagramId) {
     const name = document.getElementById('diagram-name').value;
     // Flush Firestore immediately (replaces the cancelled debounce)
-    setDoc(doc(db, 'users', currentUser.uid, 'diagrams', currentDiagramId), {
-      name, nodes: S.nodes, edges: S.edges, nextId: S.nextId, updatedAt: serverTimestamp(),
-    }).catch(() => {});
+    saveCanvas({ name, nodes: S.nodes, edges: S.edges, nextId: S.nextId }, currentDiagramId, currentUser.uid).catch(() => {});
   }
   show('home');
   loadHome();
@@ -6144,7 +6194,6 @@ document.getElementById('btn-back-home').addEventListener('click', () => {
 // ── Physical Table (Relational) ───────────────────────────────────────────────
 const STB = { tables: [], nextId: 1, linkedLmDiagramId: null };
 const HTB = { stack: [], idx: -1 };
-let ptSaveTimer = null;
 const PT_DATA_TYPES = ['INT','BIGINT','VARCHAR(50)','VARCHAR(100)','VARCHAR(255)','TEXT','BOOLEAN','DATE','DATETIME','TIMESTAMP','FLOAT','DECIMAL(10,2)','JSON'];
 
 function ptGenId(prefix) { return prefix + (STB.nextId++); }
@@ -6629,7 +6678,7 @@ document.getElementById('pt-btn-add-table').addEventListener('click', () => {
 // ── PT: Undo/Redo ─────────────────────────────────────────────────────────────
 document.getElementById('pt-btn-undo').addEventListener('click', ptUndo);
 document.getElementById('pt-btn-redo').addEventListener('click', ptRedo);
-document.getElementById('pt-btn-save').addEventListener('click', () => { clearTimeout(ptSaveTimer); ptScheduleSave(); });
+document.getElementById('pt-btn-save').addEventListener('click', () => { cancelAutoSave('pt'); ptScheduleSave(); });
 
 // ── PT: Keyboard shortcuts ────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
@@ -6637,7 +6686,7 @@ document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
   if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); ptUndo(); }
   if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); ptRedo(); }
-  if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); clearTimeout(ptSaveTimer); ptScheduleSave(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); cancelAutoSave('pt'); ptScheduleSave(); }
 });
 
 // ── PT: Save ──────────────────────────────────────────────────────────────────
@@ -6646,31 +6695,30 @@ function ptScheduleSave() {
   if (!currentDiagramId) return;
   const name = document.getElementById('pt-diagram-name').value;
   document.getElementById('pt-save-status').textContent = '未儲存…';
-  clearTimeout(ptSaveTimer);
-  ptSaveTimer = setTimeout(async () => {
+  autoSave('pt', async () => {
     try {
-      await setDoc(doc(db, 'users', currentUser.uid, 'diagrams', currentDiagramId), {
+      await saveCanvas({
         diagramType: 'physical', physicalStyle: 'table', name,
         tables: STB.tables, nextId: STB.nextId,
-        linkedLmDiagramId: STB.linkedLmDiagramId || null, updatedAt: serverTimestamp()
-      });
+        linkedLmDiagramId: STB.linkedLmDiagramId || null,
+      }, currentDiagramId, currentUser.uid);
       document.getElementById('pt-save-status').textContent = '已儲存';
     } catch(e) { document.getElementById('pt-save-status').textContent = '儲存失敗'; }
-  }, SERVER_SAVE_DEBOUNCE_MS);
+  }, AUTO_SAVE_DEBOUNCE_MS);
 }
 document.getElementById('pt-diagram-name').addEventListener('input', ptScheduleSave);
 
 // ── PT: Back to home ──────────────────────────────────────────────────────────
 document.getElementById('pt-btn-back-home').addEventListener('click', () => {
-  clearTimeout(ptSaveTimer); ptSaveTimer = null;
+  cancelAutoSave('pt');
   if (currentDiagramId) {
     const name = document.getElementById('pt-diagram-name').value;
     // Flush Firestore immediately (replaces the cancelled debounce)
-    setDoc(doc(db, 'users', currentUser.uid, 'diagrams', currentDiagramId), {
+    saveCanvas({
       diagramType: 'physical', physicalStyle: 'table', name,
       tables: STB.tables, nextId: STB.nextId,
-      linkedLmDiagramId: STB.linkedLmDiagramId || null, updatedAt: serverTimestamp(),
-    }).catch(() => {});
+      linkedLmDiagramId: STB.linkedLmDiagramId || null,
+    }, currentDiagramId, currentUser.uid).catch(() => {});
   }
   window.location.href = 'app.html';
 });
@@ -6767,8 +6815,8 @@ function openPhysicalTableDiagram(id, data, fromNormalize, lmId) {
     const theLmId = lmId || STB.linkedLmDiagramId;
     (async () => {
       let snap = null;
-      try { snap = await getDocFromServer(doc(db,'users',currentUser.uid,'diagrams',theLmId)); }
-      catch(_) { snap = await getDoc(doc(db,'users',currentUser.uid,'diagrams',theLmId)); }
+      try { snap = await getDocFromServer(doc(db,'users',currentUser.uid,'projects',theLmId)); }
+      catch(_) { snap = await getDoc(doc(db,'users',currentUser.uid,'projects',theLmId)); }
       const lmData = snap.exists() ? snap.data() : null;
       if (!(lmData && lmData.diagramType === 'logical' && Array.isArray(lmData.tables))) return;
       STB.tables = lmData.tables.map(lt => {
