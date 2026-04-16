@@ -164,6 +164,62 @@
     .pt-nf-btn.comp.active { border-color:#7c3aed; background:#f5f3ff; }
     .pt-nf-btn.pd.active  { border-color:#ca8a04; background:#fefce8; }
     .pt-nf-btn.td.active  { border-color:#dc2626; background:#fef2f2; }
+
+    .panel-toggle {
+      display:none; width:30px; height:30px; border:1px solid #e5e7eb; border-radius:8px;
+      background:white; color:#475569; align-items:center; justify-content:center; flex-shrink:0;
+    }
+    .panel-toggle:hover { background:#f8fafc; }
+    .side-panel-overlay {
+      display:none; position:absolute; inset:0; background:rgba(15,23,42,0.25); z-index:100;
+    }
+    .responsive-toolbar {
+      overflow-x:auto; overflow-y:hidden; white-space:nowrap; scrollbar-width:none;
+    }
+    .responsive-toolbar::-webkit-scrollbar { display:none; }
+
+    @media (max-width: 1024px) {
+      .panel-toggle { display:inline-flex; }
+      #home-layout, #er-layout, #lm-layout, #pm-layout { position:relative; }
+      #home-layout > .side-panel,
+      #er-layout > .side-panel,
+      #lm-layout > .side-panel,
+      #pm-layout > .side-panel {
+        position:absolute; top:0; bottom:0; left:0; z-index:110;
+        transform:translateX(-100%); transition:transform 0.2s ease;
+        box-shadow:0 10px 28px rgba(15,23,42,0.2);
+      }
+      #home-layout.side-open > .side-panel,
+      #er-layout.side-open > .side-panel,
+      #lm-layout.side-open > .side-panel,
+      #pm-layout.side-open > .side-panel {
+        transform:translateX(0);
+      }
+      #home-layout.side-open > .side-panel-overlay,
+      #er-layout.side-open > .side-panel-overlay,
+      #lm-layout.side-open > .side-panel-overlay,
+      #pm-layout.side-open > .side-panel-overlay {
+        display:block;
+      }
+      #scr-home main, #pt-content { padding:16px !important; }
+      #home-grid, #trash-grid { grid-template-columns:repeat(auto-fill,minmax(155px,1fr)) !important; }
+      #pt-norm-panel { width:min(92vw,400px) !important; }
+    }
+
+    @media (max-width: 768px) {
+      #scr-home > header,
+      #scr-app > header,
+      #scr-logical > header,
+      #scr-physical > header,
+      #scr-pt > header {
+        padding-left:10px !important; padding-right:10px !important; gap:8px !important;
+      }
+      #diagram-name, #lm-diagram-name, #pm-diagram-name, #pt-diagram-name {
+        width:min(52vw,180px) !important;
+      }
+      #scr-home main, #pt-content { padding:12px !important; }
+      #home-grid, #trash-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:12px !important; }
+    }
   </style>
 </head>
 <body style="display:flex;flex-direction:column;height:100vh;">
@@ -239,16 +295,19 @@
       </div>
       <span class="font-bold text-gray-900 text-sm">ERCanvas</span>
     </div>
+    <button id="home-side-toggle" class="panel-toggle" type="button" aria-label="切換側欄">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    </button>
     <div class="flex-1"></div>
     <span id="home-username" class="text-sm text-gray-500 hidden sm:block mr-1"></span>
     <img id="home-avatar" src="" alt="" class="w-7 h-7 rounded-full border border-gray-200 flex-shrink-0" style="display:none"/>
     <button id="home-logout" class="text-xs text-gray-400 hover:text-gray-700 transition-colors ml-2">登出</button>
   </header>
 
-  <div class="flex flex-1 overflow-hidden">
+  <div id="home-layout" class="flex flex-1 overflow-hidden">
 
     <!-- Sidebar -->
-    <aside class="w-52 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 p-4 gap-3">
+    <aside id="home-sidebar" class="side-panel w-52 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 p-4 gap-3">
       <button id="btn-new-diagram"
         class="flex items-center justify-center gap-2 bg-blue-600 text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-sm shadow-blue-200">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
@@ -287,6 +346,7 @@
         </div>
       </nav>
     </aside>
+    <div id="home-side-overlay" class="side-panel-overlay"></div>
 
     <!-- Main -->
     <main class="flex-1 overflow-y-auto p-8">
@@ -340,6 +400,9 @@
       </div>
       <span class="font-bold text-gray-900 text-sm hidden sm:block">ERCanvas</span>
     </button>
+    <button id="er-side-toggle" class="panel-toggle" type="button" aria-label="切換側欄">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    </button>
     <div class="w-px h-5 bg-gray-200"></div>
     <input id="diagram-name" type="text" value="未命名圖表"
       class="text-sm font-semibold text-gray-800 bg-transparent border border-transparent hover:border-gray-200 focus:border-blue-400 rounded px-2 py-1 outline-none w-40"/>
@@ -358,7 +421,7 @@
   <div id="share-mode-bar"></div>
 
   <!-- Second toolbar -->
-  <div id="top-toolbar" class="bg-white border-b border-gray-100 flex items-center px-3 h-9 flex-shrink-0 gap-1 select-none">
+  <div id="top-toolbar" class="responsive-toolbar bg-white border-b border-gray-100 flex items-center px-3 h-9 flex-shrink-0 gap-1 select-none">
     <!-- Undo / Redo -->
     <button id="btn-undo" title="上一步 Ctrl+Z" disabled class="tbar-btn flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 7L1 5l2-2"/><path d="M1 5h8a4 4 0 0 1 0 8H5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -401,10 +464,10 @@
     <div id="share-toast" style="display:none;" class="ml-2 text-[11px] text-green-600 font-medium animate-pulse">已複製連結！</div>
   </div>
 
-  <div class="flex flex-1 overflow-hidden">
+  <div id="er-layout" class="flex flex-1 overflow-hidden">
 
     <!-- Sidebar -->
-    <aside class="w-44 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 overflow-y-auto">
+    <aside id="er-sidebar" class="side-panel w-44 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 overflow-y-auto">
       <div class="p-3 space-y-1.5">
         <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">點擊元素再點畫布放置</p>
         <div class="shape-item" data-type="entity">
@@ -450,6 +513,7 @@
         <p class="text-[9px] text-gray-300 mt-2 leading-relaxed text-center">雙擊節點編輯文字<br/>Shift+點擊多選<br/>Esc 取消目前動作</p>
       </div>
     </aside>
+    <div id="er-side-overlay" class="side-panel-overlay"></div>
 
     <!-- Canvas -->
     <div id="canvas-wrap" class="flex-1 overflow-hidden relative">
@@ -1118,6 +1182,9 @@
       </div>
       <span class="font-bold text-gray-900 text-sm hidden sm:block">ERCanvas</span>
     </button>
+    <button id="lm-side-toggle" class="panel-toggle" type="button" aria-label="切換側欄">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    </button>
     <div class="w-px h-5 bg-gray-200"></div>
     <div class="flex items-center gap-1.5">
       <span class="text-[10px] text-purple-600 bg-purple-50 border border-purple-200 rounded px-1.5 py-0.5 font-semibold">邏輯模型</span>
@@ -1136,7 +1203,7 @@
   <!-- Readonly / shared mode banner (logical) -->
   <div id="lm-share-mode-bar" style="display:none; flex-shrink:0; padding:6px 16px; font-size:12px; font-weight:500; text-align:center; border-bottom:1px solid transparent;"></div>
 
-  <div class="bg-white border-b border-gray-100 flex items-center px-3 h-9 flex-shrink-0 gap-1 select-none">
+  <div class="responsive-toolbar bg-white border-b border-gray-100 flex items-center px-3 h-9 flex-shrink-0 gap-1 select-none">
     <button id="lm-btn-undo" disabled class="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 7L1 5l2-2"/><path d="M1 5h8a4 4 0 0 1 0 8H5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>上一步
     </button>
@@ -1154,8 +1221,8 @@
     <span id="lm-zoom-label" class="text-[10px] text-gray-400 ml-1">100%</span>
   </div>
 
-  <div class="flex flex-1 overflow-hidden">
-    <aside class="w-44 bg-white border-r border-gray-200 flex flex-col flex-shrink-0">
+  <div id="lm-layout" class="flex flex-1 overflow-hidden">
+    <aside id="lm-sidebar" class="side-panel w-44 bg-white border-r border-gray-200 flex flex-col flex-shrink-0">
       <div class="p-3 space-y-1.5">
         <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">點擊後在畫布放置</p>
         <div id="lm-add-table-btn" class="shape-item">
@@ -1177,6 +1244,7 @@
         <p class="text-[9px] text-gray-300 leading-relaxed text-center">雙擊表名/欄位重新命名<br/>Shift+點擊多選<br/>右鍵拖曳欄位可複製連線<br/>Esc 取消目前動作</p>
       </div>
     </aside>
+    <div id="lm-side-overlay" class="side-panel-overlay"></div>
 
     <div id="lm-canvas-wrap" class="flex-1 overflow-hidden relative">
       <svg id="lm-svg" xmlns="http://www.w3.org/2000/svg">
@@ -1358,7 +1426,7 @@
     <button id="pt-btn-logout" class="text-xs text-gray-400 hover:text-gray-700 transition-colors">登出</button>
   </header>
 
-  <div class="bg-white border-b border-gray-100 flex items-center px-3 h-9 flex-shrink-0 gap-1 select-none">
+  <div class="responsive-toolbar bg-white border-b border-gray-100 flex items-center px-3 h-9 flex-shrink-0 gap-1 select-none">
     <button id="pt-btn-undo" disabled class="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 7L1 5l2-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M1 5h8a4 4 0 0 1 0 8H5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>上一步
     </button>
@@ -1469,6 +1537,9 @@
       </div>
       <span class="font-bold text-gray-900 text-sm hidden sm:block">ERCanvas</span>
     </button>
+    <button id="pm-side-toggle" class="panel-toggle" type="button" aria-label="切換側欄">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    </button>
     <div class="w-px h-5 bg-gray-200"></div>
     <div class="flex items-center gap-1.5">
       <span class="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 font-semibold">實體模型</span>
@@ -1487,7 +1558,7 @@
   <!-- Readonly / shared mode banner (physical) -->
   <div id="pm-share-mode-bar" style="display:none; flex-shrink:0; padding:6px 16px; font-size:12px; font-weight:500; text-align:center; border-bottom:1px solid transparent;"></div>
 
-  <div class="bg-white border-b border-gray-100 flex items-center px-3 h-9 flex-shrink-0 gap-1 select-none">
+  <div class="responsive-toolbar bg-white border-b border-gray-100 flex items-center px-3 h-9 flex-shrink-0 gap-1 select-none">
     <button id="pm-btn-undo" disabled class="flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 7L1 5l2-2"/><path d="M1 5h8a4 4 0 0 1 0 8H5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>上一步
     </button>
@@ -1503,8 +1574,8 @@
     <span class="text-xs text-gray-400 px-1" id="pm-zoom-label">100%</span>
   </div>
 
-  <div class="flex flex-1 overflow-hidden">
-    <aside style="width:150px;background:white;border-right:1px solid #e5e7eb;padding:12px;display:flex;flex-direction:column;gap:8px;flex-shrink:0;">
+  <div id="pm-layout" class="flex flex-1 overflow-hidden">
+    <aside id="pm-sidebar" class="side-panel" style="width:150px;background:white;border-right:1px solid #e5e7eb;padding:12px;display:flex;flex-direction:column;gap:8px;flex-shrink:0;">
       <p style="font-size:10px;font-weight:700;color:#6b7280;letter-spacing:.5px;margin-bottom:2px;">點擊後在畫布放置</p>
       <div id="pm-add-table-item" style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;cursor:pointer;border:1.5px solid #e5e7eb;transition:all .15s;user-select:none;" onmouseenter="this.style.background='#ECFDF5';this.style.borderColor='#6EE7B7'" onmouseleave="this.style.background='';this.style.borderColor='#e5e7eb'">
         <svg width="18" height="14" viewBox="0 0 22 18" fill="none"><rect x="1" y="1" width="20" height="16" rx="2" fill="white" stroke="#374151" stroke-width="1.5"/><line x1="1" y1="6" x2="21" y2="6" stroke="#374151" stroke-width="1.2"/></svg>
@@ -1512,6 +1583,7 @@
       </div>
       <p style="font-size:10px;color:#9ca3af;margin-top:4px;line-height:1.4;">雙擊欄位改名<br/>點擊欄位設定型別</p>
     </aside>
+    <div id="pm-side-overlay" class="side-panel-overlay"></div>
 
     <div id="pm-canvas-wrap" style="flex:1;overflow:hidden;position:relative;background:#f8fafc;">
       <svg id="pm-svg" style="width:100%;height:100%;display:block;">
@@ -1818,9 +1890,58 @@ const $ctxMenu  = document.getElementById('ctx-menu');
 const $hint     = document.getElementById('status-hint');
 const $wrap     = document.getElementById('canvas-wrap');
 const nEls = new Map(), eEls = new Map();
+const SIDE_LAYOUT_IDS = ['home-layout', 'er-layout', 'lm-layout', 'pm-layout'];
 
 // ── Screen manager ────────────────────────────────────────────────────────────
+function isCompactLayout() {
+  return window.matchMedia('(max-width: 1024px)').matches;
+}
+function closeAllSidePanels() {
+  SIDE_LAYOUT_IDS.forEach(id => {
+    const layout = document.getElementById(id);
+    if (layout) layout.classList.remove('side-open');
+  });
+}
+function setSidePanel(layoutId, open) {
+  const layout = document.getElementById(layoutId);
+  if (!layout) return;
+  if (!isCompactLayout()) { layout.classList.remove('side-open'); return; }
+  layout.classList.toggle('side-open', !!open);
+}
+function toggleSidePanel(layoutId) {
+  const layout = document.getElementById(layoutId);
+  if (!layout) return;
+  setSidePanel(layoutId, !layout.classList.contains('side-open'));
+}
+function bindSidePanel(toggleId, overlayId, layoutId, sidebarId) {
+  const toggle = document.getElementById(toggleId);
+  if (toggle) toggle.addEventListener('click', () => toggleSidePanel(layoutId));
+  const overlay = document.getElementById(overlayId);
+  if (overlay) overlay.addEventListener('click', () => setSidePanel(layoutId, false));
+  const sidebar = document.getElementById(sidebarId);
+  if (sidebar) {
+    sidebar.addEventListener('click', (e) => {
+      if (!isCompactLayout()) return;
+      if (!e.target.closest('button, .shape-item, #lm-add-table-btn, #pm-add-table-item, #nav-my-diagrams, #nav-trash')) return;
+      setSidePanel(layoutId, false);
+    });
+  }
+}
+function initResponsivePanels() {
+  bindSidePanel('home-side-toggle', 'home-side-overlay', 'home-layout', 'home-sidebar');
+  bindSidePanel('er-side-toggle',   'er-side-overlay',   'er-layout',   'er-sidebar');
+  bindSidePanel('lm-side-toggle',   'lm-side-overlay',   'lm-layout',   'lm-sidebar');
+  bindSidePanel('pm-side-toggle',   'pm-side-overlay',   'pm-layout',   'pm-sidebar');
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeAllSidePanels();
+  });
+  window.addEventListener('resize', () => {
+    if (!isCompactLayout()) closeAllSidePanels();
+  });
+}
+
 function show(name) {
+  closeAllSidePanels();
   ['scr-loading','scr-setup','scr-login','scr-home','scr-app','scr-logical','scr-physical','scr-pt'].forEach(id => {
     document.getElementById(id).style.display = 'none';
   });
@@ -1863,6 +1984,7 @@ const _cachedSession = (() => {
 const _urlParams = new URLSearchParams(window.location.search);
 const _directId = _urlParams.get('id');
 const _directType = _urlParams.get('type');
+initResponsivePanels();
 
 if (_cachedSession && !_directId) {
   // Restore minimal user info and show home instantly
@@ -3901,7 +4023,7 @@ document.getElementById('btn-share').addEventListener('click', () => {
   if (_viewerMode && !isSharedLogical) {
     document.getElementById('top-toolbar').style.pointerEvents = 'none';
     document.getElementById('top-toolbar').style.opacity = '0.4';
-    document.querySelector('aside').classList.add('readonly-mode');
+    document.getElementById('er-sidebar')?.classList.add('readonly-mode');
   }
 })();
 
