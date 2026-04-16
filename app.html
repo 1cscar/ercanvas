@@ -1941,8 +1941,13 @@ function initResponsivePanels() {
   });
 }
 
-function bindCanvasTouchPanZoom(svg, state, applyTransformFn, onTransform) {
+function bindCanvasTouchPanZoom(svg, state, applyTransformFn, onTransform, options = {}) {
   if (!svg || !state || !applyTransformFn) return;
+  const isElementTouchTarget = options.isElementTouchTarget || (() => false);
+  const getPinchTarget = options.getPinchTarget || null;
+  const onPinchStart = options.onPinchStart || null;
+  const onPinchMove = options.onPinchMove || null;
+  const onPinchEnd = options.onPinchEnd || null;
   const gesture = {
     mode: null,
     moved: false,
@@ -1954,6 +1959,9 @@ function bindCanvasTouchPanZoom(svg, state, applyTransformFn, onTransform) {
     startMidX: 0,
     startMidY: 0,
     startDist: 0,
+    dragTarget: null,
+    pinchTarget: null,
+    pinchChanged: false,
   };
   const clamp = z => Math.max(0.1, Math.min(5, z));
   const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
@@ -1961,13 +1969,43 @@ function bindCanvasTouchPanZoom(svg, state, applyTransformFn, onTransform) {
     x: (a.clientX + b.clientX) / 2 - rect.left,
     y: (a.clientY + b.clientY) / 2 - rect.top,
   });
+  const mkTouchPoint = (x, y) => ({ clientX: x ?? gesture.lastX, clientY: y ?? gesture.lastY });
+  const fireMouse = (type, touch, target, buttons = 0) => {
+    const pt = touch || mkTouchPoint();
+    const evt = new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      clientX: pt.clientX,
+      clientY: pt.clientY,
+      button: 0,
+      buttons,
+      composed: true,
+    });
+    (target || svg).dispatchEvent(evt);
+  };
+  const endElementDrag = (touch) => {
+    if (gesture.mode !== 'element-drag') return;
+    fireMouse('mouseup', touch, svg, 0);
+    gesture.mode = null;
+    gesture.moved = false;
+    gesture.dragTarget = null;
+  };
+  const endElementPinch = () => {
+    if (gesture.mode !== 'element-pinch') return;
+    if (onPinchEnd) onPinchEnd(gesture.pinchTarget, gesture.pinchChanged);
+    gesture.mode = null;
+    gesture.pinchTarget = null;
+    gesture.pinchChanged = false;
+  };
 
   svg.addEventListener('touchstart', e => {
     if (e.touches.length >= 2) {
+      if (gesture.mode === 'element-drag') endElementDrag(e.touches[0]);
       const rect = svg.getBoundingClientRect();
       const t1 = e.touches[0], t2 = e.touches[1];
       const m = mid(t1, t2, rect);
-      gesture.mode = 'pinch';
+      const pinchTarget = getPinchTarget ? getPinchTarget() : null;
+      gesture.mode = pinchTarget ? 'element-pinch' : 'pinch';
       gesture.moved = true;
       gesture.startDist = dist(t1, t2) || 1;
       gesture.startZoom = state.zoom;
@@ -1975,24 +2013,62 @@ function bindCanvasTouchPanZoom(svg, state, applyTransformFn, onTransform) {
       gesture.startPanY = state.pan.y;
       gesture.startMidX = m.x;
       gesture.startMidY = m.y;
+      gesture.pinchTarget = pinchTarget;
+      gesture.pinchChanged = false;
+      if (pinchTarget && onPinchStart) onPinchStart(pinchTarget);
       e.preventDefault();
       return;
     }
     if (e.touches.length === 1) {
       const t = e.touches[0];
-      gesture.mode = 'pan';
-      gesture.moved = false;
       gesture.lastX = t.clientX;
       gesture.lastY = t.clientY;
+      if (isElementTouchTarget(e.target)) {
+        gesture.mode = 'element-drag';
+        gesture.moved = false;
+        gesture.dragTarget = (e.target instanceof Element) ? e.target : svg;
+        fireMouse('mousedown', t, gesture.dragTarget, 1);
+        e.preventDefault();
+        return;
+      }
+      gesture.mode = 'pan';
+      gesture.moved = false;
     }
   }, { passive: false });
 
   svg.addEventListener('touchmove', e => {
     if (e.touches.length >= 2) {
       if (gesture.mode !== 'pinch') {
-        const rect = svg.getBoundingClientRect();
-        const t1 = e.touches[0], t2 = e.touches[1];
-        const m = mid(t1, t2, rect);
+        if (gesture.mode === 'element-pinch') {
+          // keep element-pinch mode until fingers are released
+        } else {
+          const rect = svg.getBoundingClientRect();
+          const t1 = e.touches[0], t2 = e.touches[1];
+          const m = mid(t1, t2, rect);
+          const pinchTarget = getPinchTarget ? getPinchTarget() : null;
+          gesture.mode = pinchTarget ? 'element-pinch' : 'pinch';
+          gesture.pinchTarget = pinchTarget;
+          gesture.pinchChanged = false;
+          if (pinchTarget && onPinchStart) onPinchStart(pinchTarget);
+          gesture.startDist = dist(t1, t2) || 1;
+          gesture.startZoom = state.zoom;
+          gesture.startPanX = state.pan.x;
+          gesture.startPanY = state.pan.y;
+          gesture.startMidX = m.x;
+          gesture.startMidY = m.y;
+        }
+      }
+      const rect = svg.getBoundingClientRect();
+      const t1 = e.touches[0], t2 = e.touches[1];
+      const m = mid(t1, t2, rect);
+      const scale = (dist(t1, t2) || 1) / gesture.startDist;
+      if (gesture.mode === 'element-pinch' && gesture.pinchTarget) {
+        if (onPinchMove) onPinchMove(gesture.pinchTarget, scale, m);
+        gesture.pinchChanged = true;
+        e.preventDefault();
+        return;
+      }
+      if (gesture.mode !== 'pinch') {
         gesture.mode = 'pinch';
         gesture.startDist = dist(t1, t2) || 1;
         gesture.startZoom = state.zoom;
@@ -2001,10 +2077,6 @@ function bindCanvasTouchPanZoom(svg, state, applyTransformFn, onTransform) {
         gesture.startMidX = m.x;
         gesture.startMidY = m.y;
       }
-      const rect = svg.getBoundingClientRect();
-      const t1 = e.touches[0], t2 = e.touches[1];
-      const m = mid(t1, t2, rect);
-      const scale = (dist(t1, t2) || 1) / gesture.startDist;
       const nextZoom = clamp(gesture.startZoom * scale);
       const k = nextZoom / gesture.startZoom;
       state.zoom = nextZoom;
@@ -2012,6 +2084,15 @@ function bindCanvasTouchPanZoom(svg, state, applyTransformFn, onTransform) {
       state.pan.y = m.y - (gesture.startMidY - gesture.startPanY) * k;
       applyTransformFn();
       if (onTransform) onTransform();
+      e.preventDefault();
+      return;
+    }
+    if (e.touches.length === 1 && gesture.mode === 'element-drag') {
+      const t = e.touches[0];
+      gesture.lastX = t.clientX;
+      gesture.lastY = t.clientY;
+      fireMouse('mousemove', t, svg, 1);
+      gesture.moved = true;
       e.preventDefault();
       return;
     }
@@ -2034,6 +2115,20 @@ function bindCanvasTouchPanZoom(svg, state, applyTransformFn, onTransform) {
 
   svg.addEventListener('touchend', e => {
     if (e.touches.length >= 2) return;
+    if (gesture.mode === 'element-pinch') {
+      endElementPinch();
+      if (e.touches.length === 1) {
+        const t = e.touches[0];
+        gesture.mode = 'pan';
+        gesture.lastX = t.clientX;
+        gesture.lastY = t.clientY;
+      }
+      return;
+    }
+    if (gesture.mode === 'element-drag' && e.touches.length === 0) {
+      endElementDrag(e.changedTouches[0] || mkTouchPoint());
+      return;
+    }
     if (e.touches.length === 1) {
       const t = e.touches[0];
       gesture.mode = 'pan';
@@ -2047,6 +2142,8 @@ function bindCanvasTouchPanZoom(svg, state, applyTransformFn, onTransform) {
   }, { passive: true });
 
   svg.addEventListener('touchcancel', () => {
+    endElementDrag(mkTouchPoint());
+    endElementPinch();
     gesture.mode = null;
     gesture.moved = false;
   }, { passive: true });
@@ -3819,12 +3916,65 @@ document.getElementById('btn-zoom-fit').addEventListener('click',()=>{
   S.pan.x=(W-(x0+x1)*S.zoom)/2; S.pan.y=(H-(y0+y1)*S.zoom)/2;
   applyTransform();
 });
+let _erPinchBase = null;
 bindCanvasTouchPanZoom($svg, S, applyTransform, () => {
   if (S.selectedIds.size === 1) {
     const onlyId = [...S.selectedIds][0];
     positionToolbar(onlyId);
     renderHandles(onlyId);
   }
+}, {
+  isElementTouchTarget: target => target instanceof Element && !!target.closest('.er-node'),
+  getPinchTarget: () => {
+    if (S.selectedIds.size !== 1) return null;
+    const id = [...S.selectedIds][0];
+    const node = S.nodes.find(n => n.id === id);
+    if (!node || node.locked) return null;
+    return node;
+  },
+  onPinchStart: (node) => {
+    const c = nodeCenter(node);
+    _erPinchBase = {
+      id: node.id,
+      type: node.type,
+      cx: c.x,
+      cy: c.y,
+      w: node.w,
+      h: node.h,
+      rx: node.rx,
+      ry: node.ry,
+      hw: node.hw,
+      hh: node.hh,
+    };
+  },
+  onPinchMove: (node, scale) => {
+    if (!_erPinchBase || _erPinchBase.id !== node.id) return;
+    const clamp = (v, min, max = 9000) => Math.max(min, Math.min(max, v));
+    if (node.type === 'entity' || node.type === 'weak-entity' || node.type === 'aggregation') {
+      const w = clamp((_erPinchBase.w || 120) * scale, 24);
+      const h = clamp((_erPinchBase.h || 64) * scale, 24);
+      node.w = w; node.h = h;
+      node.x = _erPinchBase.cx - w / 2;
+      node.y = _erPinchBase.cy - h / 2;
+    } else if (node.type === 'relationship' || node.type === 'weak-relationship') {
+      node.hw = clamp((_erPinchBase.hw || 52) * scale, 12);
+      node.hh = clamp((_erPinchBase.hh || 34) * scale, 12);
+    } else {
+      node.rx = clamp((_erPinchBase.rx || 52) * scale, 12);
+      node.ry = clamp((_erPinchBase.ry || 28) * scale, 12);
+    }
+    nEls.get(node.id)?.remove();
+    nEls.delete(node.id);
+    renderNode(node);
+    refreshEdgesOf(node.id);
+    if (S.selectedIds.has(node.id)) nEls.get(node.id)?.classList.add('selected');
+    renderHandles(node.id);
+    positionToolbar(node.id);
+  },
+  onPinchEnd: (_node, changed) => {
+    _erPinchBase = null;
+    if (changed) { snapshot(); scheduleSave(); }
+  },
 });
 
 // ── Export ────────────────────────────────────────────────────────────────────
@@ -4413,6 +4563,7 @@ let lmColDragging = null; // { tableId, colId, origIdx, startX, targetIdx }
 let lmColDragActive = false;
 let lmColDragIndicator = null;
 let lmColDragGhost = null;
+let lmTouchColHold = null; // { timer, tableId, colId, startX, startY, activated }
 
 $lmSvg.addEventListener('mousedown', e => {
   if (e.button !== 2) return;
@@ -4552,65 +4703,161 @@ $lmSvg.addEventListener('mousedown', e => {
 window.addEventListener('mousemove', e => {
   if (!lmColDragging || lmRcDrag) return;
   const pt=lmToSVG(e.clientX,e.clientY);
-  if (!lmColDragActive && Math.abs(pt.x-lmColDragging.startX)>4) {
-    lmColDragActive=true;
-    const ns='http://www.w3.org/2000/svg';
-    // Drop indicator
-    lmColDragIndicator=document.createElementNS(ns,'rect');
-    lmColDragIndicator.setAttribute('width','3'); lmColDragIndicator.setAttribute('rx','1');
-    lmColDragIndicator.setAttribute('height',String(LM_COL_H));
-    lmColDragIndicator.setAttribute('fill','#2563EB');
-    lmColDragIndicator.style.pointerEvents='none';
-    $lmTblL.appendChild(lmColDragIndicator);
-    // Ghost preview
-    const _tbl=SL.tables.find(t=>t.id===lmColDragging.tableId);
-    const _col=_tbl?.columns.find(c=>c.id===lmColDragging.colId);
-    if (_tbl&&_col) {
-      const cw=lmColW(_col);
-      lmColDragGhost=document.createElementNS(ns,'g');
-      lmColDragGhost.style.pointerEvents='none';
-      lmColDragGhost.style.opacity='0.55';
-      const gr=document.createElementNS(ns,'rect');
-      gr.setAttribute('width',String(cw)); gr.setAttribute('height',String(LM_COL_H));
-      gr.setAttribute('rx','3'); gr.setAttribute('fill','#EFF6FF');
-      gr.setAttribute('stroke','#2563EB'); gr.setAttribute('stroke-width','1.5');
-      lmColDragGhost.appendChild(gr);
-      const gt=document.createElementNS(ns,'text');
-      gt.setAttribute('x',String(cw/2)); gt.setAttribute('y',String(LM_COL_H/2+1));
-      gt.setAttribute('text-anchor','middle'); gt.setAttribute('dominant-baseline','middle');
-      gt.setAttribute('font-size','11'); gt.setAttribute('font-family','sans-serif');
-      gt.setAttribute('fill','#2563EB');
-      if(_col.pk||_col.fk) gt.setAttribute('text-decoration','underline');
-      if(_col.pk) gt.setAttribute('font-weight','600');
-      gt.textContent=_col.name;
-      lmColDragGhost.appendChild(gt);
-      $lmTblL.appendChild(lmColDragGhost);
-    }
-    $lmSvg.style.cursor='grabbing';
-    lmHideCbar();
-  }
-  if (lmColDragActive) {
-    const tbl=SL.tables.find(t=>t.id===lmColDragging.tableId);
-    if (tbl) {
-      const relX=pt.x-tbl.x;
-      let targetIdx=0;
-      for (let i=0;i<tbl.columns.length;i++) {
-        if (relX>lmColX(tbl,i)+lmColW(tbl.columns[i])/2) targetIdx=i+1;
-      }
-      lmColDragging.targetIdx=targetIdx;
-      const insertX=targetIdx<tbl.columns.length?lmColX(tbl,targetIdx):lmTblW(tbl);
-      lmColDragIndicator.setAttribute('x',String(tbl.x+insertX-1));
-      lmColDragIndicator.setAttribute('y',String(tbl.y));
-    }
-    // Move ghost to follow cursor (centred on mouse)
-    if (lmColDragGhost) {
-      const _col2=tbl?.columns.find(c=>c.id===lmColDragging.colId);
-      const cw2=_col2?lmColW(_col2):40;
-      lmColDragGhost.setAttribute('transform',`translate(${pt.x-cw2/2},${pt.y-LM_COL_H/2})`);
-    }
-    e.preventDefault();
-  }
+  if (!lmColDragActive && Math.abs(pt.x-lmColDragging.startX)>4) lmStartColDragVisual(pt);
+  if (lmColDragActive) { lmUpdateColDragVisual(pt); e.preventDefault(); }
 });
+
+function lmStartColDragVisual(pt) {
+  if (!lmColDragging || lmColDragActive) return;
+  lmColDragActive=true;
+  const ns='http://www.w3.org/2000/svg';
+  lmColDragIndicator=document.createElementNS(ns,'rect');
+  lmColDragIndicator.setAttribute('width','3'); lmColDragIndicator.setAttribute('rx','1');
+  lmColDragIndicator.setAttribute('height',String(LM_COL_H));
+  lmColDragIndicator.setAttribute('fill','#2563EB');
+  lmColDragIndicator.style.pointerEvents='none';
+  $lmTblL.appendChild(lmColDragIndicator);
+  const _tbl=SL.tables.find(t=>t.id===lmColDragging.tableId);
+  const _col=_tbl?.columns.find(c=>c.id===lmColDragging.colId);
+  if (_tbl&&_col) {
+    const cw=lmColW(_col);
+    lmColDragGhost=document.createElementNS(ns,'g');
+    lmColDragGhost.style.pointerEvents='none';
+    lmColDragGhost.style.opacity='0.55';
+    const gr=document.createElementNS(ns,'rect');
+    gr.setAttribute('width',String(cw)); gr.setAttribute('height',String(LM_COL_H));
+    gr.setAttribute('rx','3'); gr.setAttribute('fill','#EFF6FF');
+    gr.setAttribute('stroke','#2563EB'); gr.setAttribute('stroke-width','1.5');
+    lmColDragGhost.appendChild(gr);
+    const gt=document.createElementNS(ns,'text');
+    gt.setAttribute('x',String(cw/2)); gt.setAttribute('y',String(LM_COL_H/2+1));
+    gt.setAttribute('text-anchor','middle'); gt.setAttribute('dominant-baseline','middle');
+    gt.setAttribute('font-size','11'); gt.setAttribute('font-family','sans-serif');
+    gt.setAttribute('fill','#2563EB');
+    if(_col.pk||_col.fk) gt.setAttribute('text-decoration','underline');
+    if(_col.pk) gt.setAttribute('font-weight','600');
+    gt.textContent=_col.name;
+    lmColDragGhost.appendChild(gt);
+    $lmTblL.appendChild(lmColDragGhost);
+  }
+  $lmSvg.style.cursor='grabbing';
+  lmHideCbar();
+  if (pt) lmUpdateColDragVisual(pt);
+}
+
+function lmUpdateColDragVisual(pt) {
+  if (!lmColDragging || !lmColDragActive) return;
+  const tbl=SL.tables.find(t=>t.id===lmColDragging.tableId);
+  if (tbl) {
+    const relX=pt.x-tbl.x;
+    let targetIdx=0;
+    for (let i=0;i<tbl.columns.length;i++) {
+      if (relX>lmColX(tbl,i)+lmColW(tbl.columns[i])/2) targetIdx=i+1;
+    }
+    lmColDragging.targetIdx=targetIdx;
+    const insertX=targetIdx<tbl.columns.length?lmColX(tbl,targetIdx):lmTblW(tbl);
+    lmColDragIndicator?.setAttribute('x',String(tbl.x+insertX-1));
+    lmColDragIndicator?.setAttribute('y',String(tbl.y));
+  }
+  if (lmColDragGhost) {
+    const _col2=tbl?.columns.find(c=>c.id===lmColDragging.colId);
+    const cw2=_col2?lmColW(_col2):40;
+    lmColDragGhost.setAttribute('transform',`translate(${pt.x-cw2/2},${pt.y-LM_COL_H/2})`);
+  }
+}
+
+function lmCancelTouchColHold() {
+  if (!lmTouchColHold) return;
+  clearTimeout(lmTouchColHold.timer);
+  lmTouchColHold = null;
+}
+
+function lmDispatchColTap(hold, touch) {
+  if (!hold?.target || !touch) return;
+  const down = new MouseEvent('mousedown', {
+    bubbles:true, cancelable:true, button:0, buttons:1,
+    clientX:touch.clientX, clientY:touch.clientY, composed:true,
+  });
+  hold.target.dispatchEvent(down);
+  const up = new MouseEvent('mouseup', {
+    bubbles:true, cancelable:true, button:0, buttons:0,
+    clientX:touch.clientX, clientY:touch.clientY, composed:true,
+  });
+  $lmSvg.dispatchEvent(up);
+}
+
+$lmSvg.addEventListener('touchstart', e => {
+  if (e.touches.length !== 1) { lmCancelTouchColHold(); return; }
+  const t = e.touches[0];
+  const colEl = e.target.dataset.colId ? e.target : e.target.closest('[data-col-id]');
+  if (!colEl || colEl.dataset.dragZone || SL.fkConnecting !== null) { lmCancelTouchColHold(); return; }
+  const tableId = colEl.dataset.tableId, colId = colEl.dataset.colId;
+  const pt = lmToSVG(t.clientX, t.clientY);
+  lmCancelTouchColHold();
+  lmTouchColHold = {
+    tableId, colId,
+    startX: t.clientX, startY: t.clientY,
+    target: colEl,
+    activated: false,
+    timer: setTimeout(() => {
+      const prevIds=new Set(SL.selectedTableIds);
+      const prevTbl=SL.selectedTableId;
+      SL.selectedTableId=tableId; SL.selectedTableIds=new Set([tableId]); SL.selectedColId={tableId,colId};
+      prevIds.forEach(id=>{ if(id!==tableId) lmRefreshTable(id); });
+      if(prevTbl && prevTbl!==tableId) lmRefreshTable(prevTbl);
+      lmRefreshTable(tableId);
+      lmHideTbar(); lmShowCbar(tableId,colId);
+      const _tbl=SL.tables.find(x=>x.id===tableId);
+      const _ci=_tbl?_tbl.columns.findIndex(c=>c.id===colId):-1;
+      lmColDragging={tableId,colId,origIdx:_ci,startX:pt.x,targetIdx:_ci};
+      lmStartColDragVisual(pt);
+      if (lmTouchColHold) lmTouchColHold.activated = true;
+    }, 320),
+  };
+  e.stopImmediatePropagation();
+}, { passive: false });
+
+$lmSvg.addEventListener('touchmove', e => {
+  if (!lmTouchColHold) return;
+  const t = e.touches[0];
+  if (!t) { lmCancelTouchColHold(); return; }
+  const moved = Math.hypot(t.clientX - lmTouchColHold.startX, t.clientY - lmTouchColHold.startY);
+  if (!lmTouchColHold.activated && moved > 8) { lmCancelTouchColHold(); return; }
+  if (lmTouchColHold.activated && lmColDragActive && lmColDragging) {
+    const pt = lmToSVG(t.clientX, t.clientY);
+    lmUpdateColDragVisual(pt);
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }
+}, { passive: false });
+
+$lmSvg.addEventListener('touchend', e => {
+  if (!lmTouchColHold) return;
+  const hold = lmTouchColHold;
+  const wasActive = hold.activated;
+  const touch = e.changedTouches[0];
+  lmCancelTouchColHold();
+  if (wasActive && lmColDragging) {
+    _lmMouseUp({});
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return;
+  }
+  if (!wasActive && touch) {
+    const moved = Math.hypot(touch.clientX - hold.startX, touch.clientY - hold.startY);
+    if (moved <= 8) {
+      lmDispatchColTap(hold, touch);
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  }
+}, { passive: false });
+
+$lmSvg.addEventListener('touchcancel', () => {
+  const wasActive = !!lmTouchColHold?.activated;
+  lmCancelTouchColHold();
+  if (wasActive && lmColDragging) _lmMouseUp({});
+}, { passive: true });
 
 $lmSvg.addEventListener('mousemove', e => {
   if (lmColDragActive) return; // handled by window listener
@@ -4939,6 +5186,8 @@ document.getElementById('lm-btn-zoom-fit').addEventListener('click',()=>{
 bindCanvasTouchPanZoom($lmSvg, SL, lmApplyTransform, () => {
   if (SL.selectedColId) lmShowCbar(SL.selectedColId.tableId, SL.selectedColId.colId, true);
   else if (SL.selectedTableId) lmShowTbar(SL.selectedTableId);
+}, {
+  isElementTouchTarget: target => target instanceof Element && !!target.closest('[data-drag-zone]'),
 });
 
 // ── Toolbar drag (unified) ────────────────────────────────────────────────────
@@ -5729,6 +5978,7 @@ let pmColDragging = null; // { tableId, colId, origIdx, startY, targetIdx }
 let pmColDragActive = false;
 let pmColDragIndicator = null;
 let pmColDragGhost = null;
+let pmTouchColHold = null; // { timer, tableId, colId, startX, startY, activated }
 
 $pmSvg.addEventListener('mousedown', e => {
   if (e.button !== 2) return;
@@ -5816,57 +6066,146 @@ $pmSvg.addEventListener('dblclick', e => {
 window.addEventListener('mousemove', e => {
   if (!pmColDragging || pmRcDrag) return;
   const pt=pmToSVG(e.clientX,e.clientY);
-  if (!pmColDragActive && Math.abs(pt.y-pmColDragging.startY)>4) {
-    pmColDragActive=true;
-    const ns='http://www.w3.org/2000/svg';
-    pmColDragIndicator=document.createElementNS(ns,'rect');
-    pmColDragIndicator.setAttribute('width',String(PM_COL_W));
-    pmColDragIndicator.setAttribute('height','3'); pmColDragIndicator.setAttribute('rx','1');
-    pmColDragIndicator.setAttribute('fill','#2563EB');
-    pmColDragIndicator.style.pointerEvents='none';
-    $pmTblL.appendChild(pmColDragIndicator);
-    // Ghost preview row
-    const _gtbl=SP.tables.find(t=>t.id===pmColDragging.tableId);
-    const _gcol=_gtbl?.columns.find(c=>c.id===pmColDragging.colId);
-    if (_gtbl&&_gcol) {
-      pmColDragGhost=document.createElementNS(ns,'g');
-      pmColDragGhost.style.pointerEvents='none'; pmColDragGhost.style.opacity='0.55';
-      const gr=document.createElementNS(ns,'rect');
-      gr.setAttribute('width',String(PM_COL_W)); gr.setAttribute('height',String(PM_ROW_H));
-      gr.setAttribute('rx','2'); gr.setAttribute('fill','#EFF6FF');
-      gr.setAttribute('stroke','#2563EB'); gr.setAttribute('stroke-width','1.5');
-      pmColDragGhost.appendChild(gr);
-      const midY=PM_ROW_H/2+1;
-      if(_gcol.pk){const kt=document.createElementNS(ns,'text');kt.setAttribute('x','4');kt.setAttribute('y',String(midY));kt.setAttribute('dominant-baseline','middle');kt.setAttribute('font-size','8');kt.setAttribute('font-weight','700');kt.setAttribute('fill','#C2410C');kt.setAttribute('font-family','sans-serif');kt.textContent='PK';pmColDragGhost.appendChild(kt);}
-      else if(_gcol.fk){const kt=document.createElementNS(ns,'text');kt.setAttribute('x','4');kt.setAttribute('y',String(midY));kt.setAttribute('dominant-baseline','middle');kt.setAttribute('font-size','8');kt.setAttribute('font-weight','700');kt.setAttribute('fill','#2563EB');kt.setAttribute('font-family','sans-serif');kt.textContent='FK';pmColDragGhost.appendChild(kt);}
-      const nameX=_gcol.pk||_gcol.fk?20:6;
-      const gn=document.createElementNS(ns,'text');gn.setAttribute('x',String(nameX));gn.setAttribute('y',String(midY));gn.setAttribute('dominant-baseline','middle');gn.setAttribute('font-size','11');gn.setAttribute('font-family','sans-serif');gn.setAttribute('fill','#374151');if(_gcol.pk)gn.setAttribute('font-weight','600');if(_gcol.nn)gn.setAttribute('text-decoration','underline');gn.textContent=pmTrunc(_gcol.name,PM_NAME_W-nameX-4,11);pmColDragGhost.appendChild(gn);
-      const gt=document.createElementNS(ns,'text');gt.setAttribute('x',String(PM_NAME_W+4));gt.setAttribute('y',String(midY));gt.setAttribute('dominant-baseline','middle');gt.setAttribute('font-size','10');gt.setAttribute('font-family','monospace');gt.setAttribute('fill','#475569');gt.textContent=pmTrunc(_gcol.type||'VARCHAR',PM_TYPE_W-8,10,true);pmColDragGhost.appendChild(gt);
-      $pmTblL.appendChild(pmColDragGhost);
-    }
-    $pmSvg.style.cursor='grabbing';
-    pmHideCbar();
-  }
-  if (pmColDragActive) {
-    const tbl=SP.tables.find(t=>t.id===pmColDragging.tableId);
-    if (tbl) {
-      const dataY0=tbl.y+PM_HDR_H+PM_SUBHDR_H;
-      const relY=pt.y-dataY0;
-      let targetIdx=0;
-      for (let i=0;i<tbl.columns.length;i++) {
-        if (relY>i*PM_ROW_H+PM_ROW_H/2) targetIdx=i+1;
-      }
-      pmColDragging.targetIdx=targetIdx;
-      pmColDragIndicator.setAttribute('x',String(tbl.x));
-      pmColDragIndicator.setAttribute('y',String(dataY0+targetIdx*PM_ROW_H-1));
-    }
-    // Move ghost to follow cursor (centred vertically)
-    if (pmColDragGhost) {
-      pmColDragGhost.setAttribute('transform',`translate(${pt.x-PM_COL_W/2},${pt.y-PM_ROW_H/2})`);
-    }
-    e.preventDefault();
-  }
+  if (!pmColDragActive && Math.abs(pt.y-pmColDragging.startY)>4) pmStartColDragVisual(pt);
+  if (pmColDragActive) { pmUpdateColDragVisual(pt); e.preventDefault(); }
 });
+
+function pmStartColDragVisual(pt) {
+  if (!pmColDragging || pmColDragActive) return;
+  pmColDragActive=true;
+  const ns='http://www.w3.org/2000/svg';
+  pmColDragIndicator=document.createElementNS(ns,'rect');
+  pmColDragIndicator.setAttribute('width',String(PM_COL_W));
+  pmColDragIndicator.setAttribute('height','3'); pmColDragIndicator.setAttribute('rx','1');
+  pmColDragIndicator.setAttribute('fill','#2563EB');
+  pmColDragIndicator.style.pointerEvents='none';
+  $pmTblL.appendChild(pmColDragIndicator);
+  const _gtbl=SP.tables.find(t=>t.id===pmColDragging.tableId);
+  const _gcol=_gtbl?.columns.find(c=>c.id===pmColDragging.colId);
+  if (_gtbl&&_gcol) {
+    pmColDragGhost=document.createElementNS(ns,'g');
+    pmColDragGhost.style.pointerEvents='none'; pmColDragGhost.style.opacity='0.55';
+    const gr=document.createElementNS(ns,'rect');
+    gr.setAttribute('width',String(PM_COL_W)); gr.setAttribute('height',String(PM_ROW_H));
+    gr.setAttribute('rx','2'); gr.setAttribute('fill','#EFF6FF');
+    gr.setAttribute('stroke','#2563EB'); gr.setAttribute('stroke-width','1.5');
+    pmColDragGhost.appendChild(gr);
+    const midY=PM_ROW_H/2+1;
+    if(_gcol.pk){const kt=document.createElementNS(ns,'text');kt.setAttribute('x','4');kt.setAttribute('y',String(midY));kt.setAttribute('dominant-baseline','middle');kt.setAttribute('font-size','8');kt.setAttribute('font-weight','700');kt.setAttribute('fill','#C2410C');kt.setAttribute('font-family','sans-serif');kt.textContent='PK';pmColDragGhost.appendChild(kt);}
+    else if(_gcol.fk){const kt=document.createElementNS(ns,'text');kt.setAttribute('x','4');kt.setAttribute('y',String(midY));kt.setAttribute('dominant-baseline','middle');kt.setAttribute('font-size','8');kt.setAttribute('font-weight','700');kt.setAttribute('fill','#2563EB');kt.setAttribute('font-family','sans-serif');kt.textContent='FK';pmColDragGhost.appendChild(kt);}
+    const nameX=_gcol.pk||_gcol.fk?20:6;
+    const gn=document.createElementNS(ns,'text');gn.setAttribute('x',String(nameX));gn.setAttribute('y',String(midY));gn.setAttribute('dominant-baseline','middle');gn.setAttribute('font-size','11');gn.setAttribute('font-family','sans-serif');gn.setAttribute('fill','#374151');if(_gcol.pk)gn.setAttribute('font-weight','600');if(_gcol.nn)gn.setAttribute('text-decoration','underline');gn.textContent=pmTrunc(_gcol.name,PM_NAME_W-nameX-4,11);pmColDragGhost.appendChild(gn);
+    const gt=document.createElementNS(ns,'text');gt.setAttribute('x',String(PM_NAME_W+4));gt.setAttribute('y',String(midY));gt.setAttribute('dominant-baseline','middle');gt.setAttribute('font-size','10');gt.setAttribute('font-family','monospace');gt.setAttribute('fill','#475569');gt.textContent=pmTrunc(_gcol.type||'VARCHAR',PM_TYPE_W-8,10,true);pmColDragGhost.appendChild(gt);
+    $pmTblL.appendChild(pmColDragGhost);
+  }
+  $pmSvg.style.cursor='grabbing';
+  pmHideCbar();
+  if (pt) pmUpdateColDragVisual(pt);
+}
+
+function pmUpdateColDragVisual(pt) {
+  if (!pmColDragging || !pmColDragActive) return;
+  const tbl=SP.tables.find(t=>t.id===pmColDragging.tableId);
+  if (tbl) {
+    const dataY0=tbl.y+PM_HDR_H+PM_SUBHDR_H;
+    const relY=pt.y-dataY0;
+    let targetIdx=0;
+    for (let i=0;i<tbl.columns.length;i++) {
+      if (relY>i*PM_ROW_H+PM_ROW_H/2) targetIdx=i+1;
+    }
+    pmColDragging.targetIdx=targetIdx;
+    pmColDragIndicator?.setAttribute('x',String(tbl.x));
+    pmColDragIndicator?.setAttribute('y',String(dataY0+targetIdx*PM_ROW_H-1));
+  }
+  if (pmColDragGhost) pmColDragGhost.setAttribute('transform',`translate(${pt.x-PM_COL_W/2},${pt.y-PM_ROW_H/2})`);
+}
+
+function pmCancelTouchColHold() {
+  if (!pmTouchColHold) return;
+  clearTimeout(pmTouchColHold.timer);
+  pmTouchColHold = null;
+}
+
+function pmDispatchColTap(hold, touch) {
+  if (!hold?.target || !touch) return;
+  const down = new MouseEvent('mousedown', {
+    bubbles:true, cancelable:true, button:0, buttons:1,
+    clientX:touch.clientX, clientY:touch.clientY, composed:true,
+  });
+  hold.target.dispatchEvent(down);
+  const up = new MouseEvent('mouseup', {
+    bubbles:true, cancelable:true, button:0, buttons:0,
+    clientX:touch.clientX, clientY:touch.clientY, composed:true,
+  });
+  $pmSvg.dispatchEvent(up);
+}
+
+$pmSvg.addEventListener('touchstart', e => {
+  if (e.touches.length !== 1) { pmCancelTouchColHold(); return; }
+  const t = e.touches[0];
+  const colEl=e.target.dataset.colId&&e.target.dataset.tableId?e.target:null;
+  if(!colEl || SP.fkConnecting?.tableId){ pmCancelTouchColHold(); return; }
+  const tableId=colEl.dataset.tableId,colId=colEl.dataset.colId;
+  const pt=pmToSVG(t.clientX,t.clientY);
+  pmCancelTouchColHold();
+  pmTouchColHold = {
+    tableId,colId,startX:t.clientX,startY:t.clientY,target:colEl,activated:false,
+    timer:setTimeout(()=>{
+      const prevTbl=SP.selectedTableId;
+      SP.selectedTableId=tableId; SP.selectedColId={tableId,colId};
+      if(prevTbl&&prevTbl!==tableId)pmRefreshTable(prevTbl);
+      pmRefreshTable(tableId); pmHideTbar(); pmShowCbar(tableId,colId);
+      const _tbl=SP.tables.find(x=>x.id===tableId);
+      const _ci=_tbl?_tbl.columns.findIndex(c=>c.id===colId):-1;
+      pmColDragging={tableId,colId,origIdx:_ci,startY:pt.y,targetIdx:_ci};
+      pmStartColDragVisual(pt);
+      if(pmTouchColHold) pmTouchColHold.activated=true;
+    },320),
+  };
+  e.stopImmediatePropagation();
+}, { passive:false });
+
+$pmSvg.addEventListener('touchmove', e => {
+  if (!pmTouchColHold) return;
+  const t = e.touches[0];
+  if (!t) { pmCancelTouchColHold(); return; }
+  const moved = Math.hypot(t.clientX-pmTouchColHold.startX, t.clientY-pmTouchColHold.startY);
+  if (!pmTouchColHold.activated && moved > 8) { pmCancelTouchColHold(); return; }
+  if (pmTouchColHold.activated && pmColDragActive && pmColDragging) {
+    const pt=pmToSVG(t.clientX,t.clientY);
+    pmUpdateColDragVisual(pt);
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }
+}, { passive:false });
+
+$pmSvg.addEventListener('touchend', e => {
+  if (!pmTouchColHold) return;
+  const hold = pmTouchColHold;
+  const wasActive = hold.activated;
+  const touch = e.changedTouches[0];
+  pmCancelTouchColHold();
+  if (wasActive && pmColDragging) {
+    _pmMouseUp({});
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    return;
+  }
+  if (!wasActive && touch) {
+    const moved = Math.hypot(touch.clientX - hold.startX, touch.clientY - hold.startY);
+    if (moved <= 8) {
+      pmDispatchColTap(hold, touch);
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  }
+}, { passive:false });
+
+$pmSvg.addEventListener('touchcancel', () => {
+  const wasActive = !!pmTouchColHold?.activated;
+  pmCancelTouchColHold();
+  if (wasActive && pmColDragging) _pmMouseUp({});
+}, { passive:true });
 
 $pmSvg.addEventListener('mousemove', e => {
   if (pmColDragActive) return; // handled by window listener
@@ -5954,6 +6293,8 @@ $pmSvg.addEventListener('wheel', e=>{
 bindCanvasTouchPanZoom($pmSvg, SP, pmApplyTransform, () => {
   if (SP.selectedColId) pmShowCbar(SP.selectedColId.tableId, SP.selectedColId.colId);
   else if (SP.selectedTableId) pmShowTbar(SP.selectedTableId);
+}, {
+  isElementTouchTarget: target => target instanceof Element && !!target.closest('[data-pm-drag-zone]'),
 });
 
 // ── Inline edit ───────────────────────────────────────────────────────────────
