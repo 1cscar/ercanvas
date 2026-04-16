@@ -174,6 +174,12 @@
   <p class="text-sm text-gray-400">載入中…</p>
 </div>
 
+<!-- Direct-open overlay -->
+<div id="open-loading-mask" class="fixed inset-0 bg-white/82 backdrop-blur-[1px] flex-col items-center justify-center z-[60]" style="display:none;">
+  <div class="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-2"></div>
+  <p id="open-loading-text" class="text-sm text-gray-500">載入圖檔中…</p>
+</div>
+
 <!-- SETUP -->
 <div id="scr-setup" class="fixed inset-0 bg-gray-50 items-center justify-center z-40" style="display:none;">
   <div class="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
@@ -1823,6 +1829,31 @@ function show(name) {
   if (['app','home','logical','physical','pt'].includes(name)) el.style.flexDirection = 'column';
 }
 
+function setOpenLoading(visible, text = '載入圖檔中…') {
+  const mask = document.getElementById('open-loading-mask');
+  const txt = document.getElementById('open-loading-text');
+  if (!mask || !txt) return;
+  txt.textContent = text;
+  mask.style.display = visible ? 'flex' : 'none';
+}
+
+function showDirectSkeleton(type) {
+  if (type === 'logical') {
+    show('logical');
+    const nm = document.getElementById('lm-diagram-name');
+    if (nm) nm.value = '載入中…';
+  } else if (type === 'physical') {
+    show('physical');
+    const nm = document.getElementById('pm-diagram-name');
+    if (nm) nm.value = '載入中…';
+  } else {
+    show('app');
+    const nm = document.getElementById('diagram-name');
+    if (nm) nm.value = '載入中…';
+  }
+  setOpenLoading(true, '載入圖檔中…');
+}
+
 // ── Local-first boot ─────────────────────────────────────────────────────────
 // Try to show Home immediately from localStorage before Firebase responds
 const _cachedSession = (() => {
@@ -1879,20 +1910,29 @@ function boot() {
         if (window._directOpenDone) return;
         window._directOpenDone = true;
         const _openDirect = async () => {
-          const diagData = await fetchCanvas(directId, user.uid);
-          if (!diagData) { show('home'); loadHome(); updateTrashBadge(); return; }
-          if (directType === 'er') openDiagram(directId, diagData);
-          else if (directType === 'logical') openLogicalDiagram(directId, diagData);
-          else if (directType === 'physical') {
-            if (diagData.physicalStyle === 'table') {
-              openPhysicalTableDiagram(directId, diagData, fromNormalize, lmId);
-            } else {
-              openPhysicalDiagram(directId, diagData);
+          try {
+            showDirectSkeleton(directType);
+            const diagData = await fetchCanvas(directId, user.uid);
+            if (!diagData) { setOpenLoading(false); show('home'); loadHome(); updateTrashBadge(); return; }
+            if (directType === 'er') openDiagram(directId, diagData);
+            else if (directType === 'logical') openLogicalDiagram(directId, diagData);
+            else if (directType === 'physical') {
+              if (diagData.physicalStyle === 'table') {
+                openPhysicalTableDiagram(directId, diagData, fromNormalize, lmId);
+              } else {
+                openPhysicalDiagram(directId, diagData);
+              }
             }
+          } catch (e) {
+            console.error('direct open failed:', e);
+            setOpenLoading(false);
+            show('home');
+            loadHome();
           }
         };
         _openDirect();
       } else {
+        setOpenLoading(false);
         if (!_cachedSession) { show('home'); }
         loadHome();
         updateTrashBadge();
@@ -2148,6 +2188,7 @@ function buildLogicalPreviewSVG(tables) {
 }
 
 async function openDiagram(id, data) {
+  setOpenLoading(false);
   stopAllListeners();
   _currentOwnerUid = currentUser.uid;
   _viewerMode = false;
@@ -5072,6 +5113,7 @@ function startLmDiagListener(diagId) {
 
 // ── Open logical diagram ──────────────────────────────────────────────────────
 function openLogicalDiagram(id, data) {
+  setOpenLoading(false);
   stopAllListeners();
   currentDiagramId=id;
   const src=data||{};
@@ -6058,6 +6100,7 @@ document.getElementById('pm-sql-download').addEventListener('click', () => {
 
 // ── Open physical diagram ─────────────────────────────────────────────────────
 function openPhysicalDiagram(id, data) {
+  setOpenLoading(false);
   const src = data || {};
   if (src.physicalStyle === 'table') {
     openPhysicalTableDiagram(id, src, false, null);
@@ -6824,6 +6867,7 @@ document.getElementById('pt-sql-download').addEventListener('click', () => {
 
 // ── Open physical table diagram ───────────────────────────────────────────────
 function openPhysicalTableDiagram(id, data, fromNormalize, lmId) {
+  setOpenLoading(false);
   stopAllListeners();
   currentDiagramId = id;
   const src = data || {};
