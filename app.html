@@ -1664,7 +1664,7 @@ let _lmRtdbTimer     = null;   // throttle for RTDB live write (logical)
 let _homeListener    = null;
 let _homeRenderSig   = '';
 let _homeGotServerSnapshot = false;
-const PROJECTS_COLLECTION = 'projects';
+const PROJECTS_COLLECTION = 'diagrams';
 const AUTO_SAVE_DEBOUNCE_MS = 100;
 const _autoSaveTimers = new Map();
 
@@ -2174,7 +2174,7 @@ let _permDeleteTarget = null; // { id, name }
 async function moveDiagramToTrash(id) {
   addPendingDelete(id);
   try {
-    await updateDoc(doc(db, 'users', currentUser.uid, 'projects', id), { deletedAt: serverTimestamp() });
+    await updateDoc(doc(db, 'users', currentUser.uid, 'diagrams', id), { deletedAt: serverTimestamp() });
     removePendingDelete(id);
     updateTrashBadge();
   } catch(e) { console.error('移至垃圾桶失敗:', e); }
@@ -2182,7 +2182,7 @@ async function moveDiagramToTrash(id) {
 
 async function updateTrashBadge() {
   try {
-    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'projects'));
+    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'diagrams'));
     let count = 0;
     snaps.forEach(s => { if (s.data().deletedAt) count++; });
     const badge = document.getElementById('trash-count-badge');
@@ -2196,7 +2196,7 @@ async function loadTrash() {
   const empty = document.getElementById('trash-empty');
   grid.innerHTML = '';
   try {
-    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'projects'));
+    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'diagrams'));
     const trashed = [];
     snaps.forEach(s => { if (s.data().deletedAt) trashed.push({ id: s.id, data: s.data() }); });
     if (!trashed.length) { empty.style.display = 'flex'; return; }
@@ -2238,7 +2238,7 @@ function renderTrashCard(id, data) {
 
 async function restoreDiagram(id) {
   try {
-    await updateDoc(doc(db, 'users', currentUser.uid, 'projects', id), { deletedAt: deleteField() });
+    await updateDoc(doc(db, 'users', currentUser.uid, 'diagrams', id), { deletedAt: deleteField() });
     document.querySelector(`#trash-grid [data-id="${id}"]`)?.remove();
     if (!document.getElementById('trash-grid').children.length)
       document.getElementById('trash-empty').style.display = 'flex';
@@ -2248,7 +2248,7 @@ async function restoreDiagram(id) {
 
 async function permanentDeleteDiagram(id) {
   try {
-    await deleteDoc(doc(db, 'users', currentUser.uid, 'projects', id));
+    await deleteDoc(doc(db, 'users', currentUser.uid, 'diagrams', id));
     document.querySelector(`#trash-grid [data-id="${id}"]`)?.remove();
     if (!document.getElementById('trash-grid').children.length)
       document.getElementById('trash-empty').style.display = 'flex';
@@ -3783,7 +3783,7 @@ document.getElementById('btn-share').addEventListener('click', () => {
 
   // Load diagram from owner's collection
   try {
-    diagSnap = await getDoc(doc(db, 'users', shareData.ownerUid, 'projects', sharedDiagId));
+    diagSnap = await getDoc(doc(db, 'users', shareData.ownerUid, 'diagrams', sharedDiagId));
   } catch(e) { alert('無法載入圖表'); return; }
   if (!diagSnap.exists()) { alert('圖表不存在'); return; }
 
@@ -4987,7 +4987,7 @@ document.getElementById('lm-btn-redo').addEventListener('click',lmRedo);
     const btn = document.getElementById('lm-btn-normalize');
     btn.disabled = true;
     try {
-      const newRef = doc(collection(db, 'users', currentUser.uid, 'projects'));
+      const newRef = doc(collection(db, 'users', currentUser.uid, 'diagrams'));
       const lmName = document.getElementById('lm-diagram-name').value || '未命名邏輯模型';
       const newData = {
         diagramType: 'physical', physicalStyle: 'table',
@@ -5109,7 +5109,7 @@ document.getElementById('lm-btn-link-er').addEventListener('click', async()=>{
   document.getElementById('lm-bind-status').textContent='';
   modal.style.display='flex';
   try {
-    const snaps=await getDocs(collection(db,'users',currentUser.uid,'projects'));
+    const snaps=await getDocs(collection(db,'users',currentUser.uid,'diagrams'));
     const ers=[];
     snaps.forEach(s=>{ const d=s.data(); if(!d.diagramType||d.diagramType==='er') ers.push({id:s.id,name:d.name||'未命名 ER 圖'}); });
     listEl.innerHTML='';
@@ -5148,7 +5148,7 @@ document.getElementById('lm-btn-convert').addEventListener('click', async()=>{
   if(!SL.linkedErDiagramId){ alert('請先連結 ER 圖'); return; }
   if(!confirm('從連結的 ER 圖產生表格（Entities→Tables，Attributes→Columns）。現有表格保留，新增不重複的。繼續？')) return;
   try {
-    const snap=await getDoc(doc(db,'users',currentUser.uid,'projects',SL.linkedErDiagramId));
+    const snap=await getDoc(doc(db,'users',currentUser.uid,'diagrams',SL.linkedErDiagramId));
     if(!snap.exists()){ alert('找不到連結的 ER 圖'); return; }
     const erData=snap.data(), nodes=erData.nodes||[], edges=erData.edges||[];
     const neighborSet = nodeId => new Set(edges.filter(e=>e.from===nodeId||e.to===nodeId).map(e=>e.from===nodeId?e.to:e.from));
@@ -5855,7 +5855,7 @@ document.getElementById('pm-btn-link-lm').addEventListener('click', async ()=>{
   list.innerHTML='<p style="font-size:12px;color:#9ca3af;text-align:center;padding:16px;">載入中…</p>';
   document.getElementById('pm-bind-status').textContent=SP.linkedLmDiagramId?'已連結邏輯模型':'未連結';
   try {
-    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'projects'));
+    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'diagrams'));
     const lmDiags = [];
     snaps.forEach(s => {
       const d = s.data();
@@ -5901,8 +5901,8 @@ document.getElementById('pm-btn-import').addEventListener('click',async()=>{
   if(!confirm('從連結的邏輯模型產生表格（現有表格保留，新增不重複的）。繼續？'))return;
   try {
     let snap = null;
-    try { snap = await getDocFromServer(doc(db,'users',currentUser.uid,'projects',SP.linkedLmDiagramId)); }
-    catch(_) { snap = await getDoc(doc(db,'users',currentUser.uid,'projects',SP.linkedLmDiagramId)); }
+    try { snap = await getDocFromServer(doc(db,'users',currentUser.uid,'diagrams',SP.linkedLmDiagramId)); }
+    catch(_) { snap = await getDoc(doc(db,'users',currentUser.uid,'diagrams',SP.linkedLmDiagramId)); }
     const lmData = snap.exists() ? snap.data() : null;
     if(!lmData||lmData.diagramType!=='logical'){alert('找不到連結的邏輯模型');return;}
     const newTbls=[];
@@ -6833,8 +6833,8 @@ function openPhysicalTableDiagram(id, data, fromNormalize, lmId) {
     const theLmId = lmId || STB.linkedLmDiagramId;
     (async () => {
       let snap = null;
-      try { snap = await getDocFromServer(doc(db,'users',currentUser.uid,'projects',theLmId)); }
-      catch(_) { snap = await getDoc(doc(db,'users',currentUser.uid,'projects',theLmId)); }
+      try { snap = await getDocFromServer(doc(db,'users',currentUser.uid,'diagrams',theLmId)); }
+      catch(_) { snap = await getDoc(doc(db,'users',currentUser.uid,'diagrams',theLmId)); }
       const lmData = snap.exists() ? snap.data() : null;
       if (!(lmData && lmData.diagramType === 'logical' && Array.isArray(lmData.tables))) return;
       STB.tables = lmData.tables.map(lt => {
