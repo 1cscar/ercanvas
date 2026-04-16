@@ -1745,8 +1745,8 @@ let _homeListener    = null;
 let _homeRenderSig   = '';
 let _homeGotServerSnapshot = false;
 const PROJECTS_COLLECTION = 'diagrams';
-const AUTO_SAVE_DEBOUNCE_MS = 100;
-const _autoSaveTimers = new Map();
+const AUTO_SAVE_DEBOUNCE_MS = 150;
+const _autoSaveTimers = new Map(); // slot -> { timer, lastRun, running, pending, job, delay }
 
 function projectCollectionRef(uid = currentUser?.uid) {
   return collection(db, 'users', uid, PROJECTS_COLLECTION);
@@ -1756,17 +1756,51 @@ function projectDocRef(uid, projectId) {
 }
 
 function autoSave(slot, job, delay = AUTO_SAVE_DEBOUNCE_MS) {
-  const prev = _autoSaveTimers.get(slot);
-  if (prev) clearTimeout(prev);
-  const timer = setTimeout(async () => {
-    try { await job(); }
-    finally { _autoSaveTimers.delete(slot); }
-  }, delay);
-  _autoSaveTimers.set(slot, timer);
+  const state = _autoSaveTimers.get(slot) || {
+    timer: null,
+    lastRun: 0,
+    running: false,
+    pending: false,
+    job: null,
+    delay,
+  };
+  state.job = job;
+  state.delay = delay;
+
+  const run = async () => {
+    if (state.running) { state.pending = true; return; }
+    state.running = true;
+    state.pending = false;
+    state.lastRun = Date.now();
+    try {
+      if (typeof state.job === 'function') await state.job();
+    } finally {
+      state.running = false;
+      if (state.pending) schedule();
+    }
+  };
+
+  const schedule = () => {
+    if (state.timer) clearTimeout(state.timer);
+    const wait = Math.max(0, state.delay - (Date.now() - state.lastRun));
+    state.timer = setTimeout(() => {
+      state.timer = null;
+      run();
+    }, wait);
+  };
+
+  const now = Date.now();
+  if (!state.lastRun || (now - state.lastRun) >= state.delay) {
+    if (state.timer) { clearTimeout(state.timer); state.timer = null; }
+    run();
+  } else {
+    schedule();
+  }
+  _autoSaveTimers.set(slot, state);
 }
 function cancelAutoSave(slot) {
-  const timer = _autoSaveTimers.get(slot);
-  if (timer) clearTimeout(timer);
+  const state = _autoSaveTimers.get(slot);
+  if (state?.timer) clearTimeout(state.timer);
   _autoSaveTimers.delete(slot);
 }
 
