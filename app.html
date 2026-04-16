@@ -11,6 +11,7 @@
     body { margin:0; overflow:hidden; font-family:sans-serif; }
     #canvas-wrap { flex:1; overflow:hidden; position:relative; background:#f8fafc; }
     #main-svg { width:100%; height:100%; display:block; }
+    #main-svg, #lm-svg, #pm-svg { touch-action: none; }
 
     .er-node .shape { transition:stroke 0.1s, stroke-width 0.1s; }
     .er-node:hover .shape { stroke:#2563EB !important; }
@@ -1940,6 +1941,117 @@ function initResponsivePanels() {
   });
 }
 
+function bindCanvasTouchPanZoom(svg, state, applyTransformFn, onTransform) {
+  if (!svg || !state || !applyTransformFn) return;
+  const gesture = {
+    mode: null,
+    moved: false,
+    lastX: 0,
+    lastY: 0,
+    startZoom: 1,
+    startPanX: 0,
+    startPanY: 0,
+    startMidX: 0,
+    startMidY: 0,
+    startDist: 0,
+  };
+  const clamp = z => Math.max(0.1, Math.min(5, z));
+  const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  const mid = (a, b, rect) => ({
+    x: (a.clientX + b.clientX) / 2 - rect.left,
+    y: (a.clientY + b.clientY) / 2 - rect.top,
+  });
+
+  svg.addEventListener('touchstart', e => {
+    if (e.touches.length >= 2) {
+      const rect = svg.getBoundingClientRect();
+      const t1 = e.touches[0], t2 = e.touches[1];
+      const m = mid(t1, t2, rect);
+      gesture.mode = 'pinch';
+      gesture.moved = true;
+      gesture.startDist = dist(t1, t2) || 1;
+      gesture.startZoom = state.zoom;
+      gesture.startPanX = state.pan.x;
+      gesture.startPanY = state.pan.y;
+      gesture.startMidX = m.x;
+      gesture.startMidY = m.y;
+      e.preventDefault();
+      return;
+    }
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      gesture.mode = 'pan';
+      gesture.moved = false;
+      gesture.lastX = t.clientX;
+      gesture.lastY = t.clientY;
+    }
+  }, { passive: false });
+
+  svg.addEventListener('touchmove', e => {
+    if (e.touches.length >= 2) {
+      if (gesture.mode !== 'pinch') {
+        const rect = svg.getBoundingClientRect();
+        const t1 = e.touches[0], t2 = e.touches[1];
+        const m = mid(t1, t2, rect);
+        gesture.mode = 'pinch';
+        gesture.startDist = dist(t1, t2) || 1;
+        gesture.startZoom = state.zoom;
+        gesture.startPanX = state.pan.x;
+        gesture.startPanY = state.pan.y;
+        gesture.startMidX = m.x;
+        gesture.startMidY = m.y;
+      }
+      const rect = svg.getBoundingClientRect();
+      const t1 = e.touches[0], t2 = e.touches[1];
+      const m = mid(t1, t2, rect);
+      const scale = (dist(t1, t2) || 1) / gesture.startDist;
+      const nextZoom = clamp(gesture.startZoom * scale);
+      const k = nextZoom / gesture.startZoom;
+      state.zoom = nextZoom;
+      state.pan.x = m.x - (gesture.startMidX - gesture.startPanX) * k;
+      state.pan.y = m.y - (gesture.startMidY - gesture.startPanY) * k;
+      applyTransformFn();
+      if (onTransform) onTransform();
+      e.preventDefault();
+      return;
+    }
+    if (e.touches.length === 1 && gesture.mode === 'pan') {
+      const t = e.touches[0];
+      const dx = t.clientX - gesture.lastX;
+      const dy = t.clientY - gesture.lastY;
+      gesture.lastX = t.clientX;
+      gesture.lastY = t.clientY;
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+        gesture.moved = true;
+        state.pan.x += dx;
+        state.pan.y += dy;
+        applyTransformFn();
+        if (onTransform) onTransform();
+        e.preventDefault();
+      }
+    }
+  }, { passive: false });
+
+  svg.addEventListener('touchend', e => {
+    if (e.touches.length >= 2) return;
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      gesture.mode = 'pan';
+      gesture.lastX = t.clientX;
+      gesture.lastY = t.clientY;
+      gesture.moved = false;
+      return;
+    }
+    gesture.mode = null;
+    gesture.moved = false;
+  }, { passive: true });
+
+  svg.addEventListener('touchcancel', () => {
+    gesture.mode = null;
+    gesture.moved = false;
+  }, { passive: true });
+}
+
 function show(name) {
   closeAllSidePanels();
   ['scr-loading','scr-setup','scr-login','scr-home','scr-app','scr-logical','scr-physical','scr-pt'].forEach(id => {
@@ -3707,6 +3819,13 @@ document.getElementById('btn-zoom-fit').addEventListener('click',()=>{
   S.pan.x=(W-(x0+x1)*S.zoom)/2; S.pan.y=(H-(y0+y1)*S.zoom)/2;
   applyTransform();
 });
+bindCanvasTouchPanZoom($svg, S, applyTransform, () => {
+  if (S.selectedIds.size === 1) {
+    const onlyId = [...S.selectedIds][0];
+    positionToolbar(onlyId);
+    renderHandles(onlyId);
+  }
+});
 
 // ── Export ────────────────────────────────────────────────────────────────────
 document.getElementById('btn-export').addEventListener('click',()=>{
@@ -4817,6 +4936,10 @@ document.getElementById('lm-btn-zoom-fit').addEventListener('click',()=>{
   SL.pan.x=(W-(x0+x1)*SL.zoom)/2; SL.pan.y=(H-(y0+y1)*SL.zoom)/2;
   lmApplyTransform();
 });
+bindCanvasTouchPanZoom($lmSvg, SL, lmApplyTransform, () => {
+  if (SL.selectedColId) lmShowCbar(SL.selectedColId.tableId, SL.selectedColId.colId, true);
+  else if (SL.selectedTableId) lmShowTbar(SL.selectedTableId);
+});
 
 // ── Toolbar drag (unified) ────────────────────────────────────────────────────
 (function() {
@@ -5828,6 +5951,10 @@ $pmSvg.addEventListener('wheel', e=>{
   SP.zoom=Math.max(0.1,Math.min(5,SP.zoom*f));
   pmApplyTransform();
 },{passive:false});
+bindCanvasTouchPanZoom($pmSvg, SP, pmApplyTransform, () => {
+  if (SP.selectedColId) pmShowCbar(SP.selectedColId.tableId, SP.selectedColId.colId);
+  else if (SP.selectedTableId) pmShowTbar(SP.selectedTableId);
+});
 
 // ── Inline edit ───────────────────────────────────────────────────────────────
 function pmOpenNameEdit(tblId) {
