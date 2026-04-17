@@ -2451,6 +2451,8 @@ let _lastExitFlushAt = 0;
 let _trashCount = 0;
 let _homeCacheWaitStart = 0;
 let _homeLoadingGuardTimer = null;
+let _homeRefreshRaf = 0;
+let _homeCreateUnlockTimer = null;
 const PROJECTS_COLLECTION = 'diagrams';
 const LEGACY_PROJECTS_COLLECTION = 'projects';
 const AUTO_SAVE_DEBOUNCE_MS = 800; // Firestore checkpoint interval
@@ -3209,6 +3211,37 @@ function show(name) {
   const el = document.getElementById('scr-' + name);
   el.style.display = 'flex';
   if (['app','home','logical','physical','pt'].includes(name)) el.style.flexDirection = 'column';
+}
+
+function setHomeCreateButtonsDisabled(disabled) {
+  ['btn-new-diagram', 'btn-new-logical', 'btn-new-physical'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.disabled = !!disabled;
+  });
+}
+
+function resetHomeReadyState() {
+  setOpenLoading(false);
+  setHomeCreateButtonsDisabled(false);
+  if (_homeCreateUnlockTimer) {
+    clearTimeout(_homeCreateUnlockTimer);
+    _homeCreateUnlockTimer = null;
+  }
+}
+
+function scheduleHomeRefresh() {
+  if (_homeRefreshRaf) cancelAnimationFrame(_homeRefreshRaf);
+  _homeRefreshRaf = requestAnimationFrame(() => {
+    _homeRefreshRaf = 0;
+    loadHome();
+    updateTrashBadge();
+  });
+}
+
+function returnToHomeAndRefresh() {
+  show('home');
+  resetHomeReadyState();
+  scheduleHomeRefresh();
 }
 
 function setOpenLoading(visible, text = '載入圖檔中…') {
@@ -4110,40 +4143,58 @@ document.getElementById('nav-trash').addEventListener('click', () => {
 
 // ── New diagram buttons ────────────────────────────────────────────────────────
 document.getElementById('btn-new-diagram').addEventListener('click', async () => {
+  const uid = currentUser?.uid || auth.currentUser?.uid;
+  if (!uid) { alert('登入狀態尚未就緒，請稍後再試'); return; }
   const btn = document.getElementById('btn-new-diagram');
   btn.disabled = true;
+  if (_homeCreateUnlockTimer) clearTimeout(_homeCreateUnlockTimer);
+  _homeCreateUnlockTimer = setTimeout(() => {
+    if (document.getElementById('scr-home')?.style.display !== 'none') setHomeCreateButtonsDisabled(false);
+  }, 8000);
   try {
-    const newRef = doc(projectCollectionRef(currentUser.uid));
+    const newRef = doc(projectCollectionRef(uid));
     const newData = { name:'未命名圖表', nodes:[], edges:[], nextId:1, updatedAt: serverTimestamp() };
     await setDoc(newRef, newData);
     window.location.href = `app.html?id=${encodeURIComponent(newRef.id)}&type=er`;
   } catch(e) {
     console.error('新增圖表失敗:', e);
     alert('新增失敗，請重試');
-    btn.disabled = false;
+    setHomeCreateButtonsDisabled(false);
   }
 });
 
 document.getElementById('btn-new-logical').addEventListener('click', async () => {
+  const uid = currentUser?.uid || auth.currentUser?.uid;
+  if (!uid) { alert('登入狀態尚未就緒，請稍後再試'); return; }
   const btn = document.getElementById('btn-new-logical');
   btn.disabled = true;
+  if (_homeCreateUnlockTimer) clearTimeout(_homeCreateUnlockTimer);
+  _homeCreateUnlockTimer = setTimeout(() => {
+    if (document.getElementById('scr-home')?.style.display !== 'none') setHomeCreateButtonsDisabled(false);
+  }, 8000);
   try {
-    const newRef = doc(projectCollectionRef(currentUser.uid));
+    const newRef = doc(projectCollectionRef(uid));
     const newData = { diagramType:'logical', name:'未命名邏輯模型', tables:[], fkLinks:[], nextId:1, linkedErDiagramId:null, updatedAt: serverTimestamp() };
     await setDoc(newRef, newData);
     window.location.href = `app.html?id=${encodeURIComponent(newRef.id)}&type=logical`;
-  } catch(e) { alert('新增失敗，請重試'); btn.disabled = false; }
+  } catch(e) { alert('新增失敗，請重試'); setHomeCreateButtonsDisabled(false); }
 });
 
 document.getElementById('btn-new-physical').addEventListener('click', async () => {
+  const uid = currentUser?.uid || auth.currentUser?.uid;
+  if (!uid) { alert('登入狀態尚未就緒，請稍後再試'); return; }
   const btn = document.getElementById('btn-new-physical');
   btn.disabled = true;
+  if (_homeCreateUnlockTimer) clearTimeout(_homeCreateUnlockTimer);
+  _homeCreateUnlockTimer = setTimeout(() => {
+    if (document.getElementById('scr-home')?.style.display !== 'none') setHomeCreateButtonsDisabled(false);
+  }, 8000);
   try {
-    const newRef = doc(projectCollectionRef(currentUser.uid));
+    const newRef = doc(projectCollectionRef(uid));
     const newData = { diagramType:'physical', name:'未命名實體模型', tables:[], fkLinks:[], nextId:1, linkedLmDiagramId:null, updatedAt: serverTimestamp() };
-    await setDoc(projectDocRef(currentUser.uid, newRef.id), newData);
+    await setDoc(projectDocRef(uid, newRef.id), newData);
     window.location.href = `app.html?id=${encodeURIComponent(newRef.id)}&type=physical`;
-  } catch(e) { console.error(e); btn.disabled = false; }
+  } catch(e) { console.error(e); setHomeCreateButtonsDisabled(false); }
 });
 
 // ── Save / Load ───────────────────────────────────────────────────────────────
@@ -7106,7 +7157,7 @@ document.getElementById('lm-btn-back-home').addEventListener('click',()=>{
       nextId:SL.nextId,linkedErDiagramId:SL.linkedErDiagramId||null,
     }, currentDiagramId, currentUser.uid).catch(()=>{});
   }
-  show('home'); loadHome();
+  returnToHomeAndRefresh();
 });
 document.getElementById('lm-btn-logout').addEventListener('click',()=>signOut(auth).then(()=>show('login')));
 
@@ -8251,7 +8302,7 @@ document.getElementById('pm-btn-back-home').addEventListener('click',()=>{
     diagramType:'physical',name,tables:SP.tables,fkLinks:SP.fkLinks,
     nextId:SP.nextId,linkedLmDiagramId:SP.linkedLmDiagramId||null,
   }, currentDiagramId, currentUser.uid).catch(()=>{});
-  show('home');loadHome();
+  returnToHomeAndRefresh();
 });
 document.getElementById('pm-btn-logout').addEventListener('click',()=>signOut(auth).then(()=>show('login')));
 
@@ -8384,8 +8435,7 @@ document.getElementById('btn-back-home').addEventListener('click', () => {
     // Flush Firestore immediately (replaces the cancelled debounce)
     saveCanvas({ name, nodes: S.nodes, edges: S.edges, nextId: S.nextId }, currentDiagramId, currentUser.uid).catch(() => {});
   }
-  show('home');
-  loadHome();
+  returnToHomeAndRefresh();
 });
 
 // ── Physical Table (Relational) ───────────────────────────────────────────────
