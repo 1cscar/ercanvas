@@ -3924,11 +3924,16 @@ async function loadTrash() {
   } catch(e) { console.error('loadTrash error:', e); }
 }
 
+async function getTrashedDiagramIds() {
+  const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'diagrams'));
+  const trashed = [];
+  snaps.forEach(s => { if (s.data().deletedAt) trashed.push(s.id); });
+  return trashed;
+}
+
 async function restoreAllFromTrash() {
   try {
-    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'diagrams'));
-    const restoreTargets = [];
-    snaps.forEach(s => { if (s.data().deletedAt) restoreTargets.push(s.id); });
+    const restoreTargets = await getTrashedDiagramIds();
     if (!restoreTargets.length) return;
     await Promise.all(
       restoreTargets.map(id => updateDoc(doc(db, 'users', currentUser.uid, 'diagrams', id), { deletedAt: deleteField() }))
@@ -3944,9 +3949,7 @@ async function restoreAllFromTrash() {
 
 async function permanentDeleteAllFromTrash() {
   try {
-    const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'diagrams'));
-    const deleteTargets = [];
-    snaps.forEach(s => { if (s.data().deletedAt) deleteTargets.push(s.id); });
+    const deleteTargets = await getTrashedDiagramIds();
     if (!deleteTargets.length) return 0;
     const results = await Promise.allSettled(
       deleteTargets.map(id => deleteDoc(doc(db, 'users', currentUser.uid, 'diagrams', id)))
@@ -4036,8 +4039,9 @@ document.getElementById('trash-restore-all').addEventListener('click', async () 
 });
 
 document.getElementById('trash-delete-all').addEventListener('click', async () => {
-  if (_trashCount <= 0) return;
-  if (!confirm(`確定要永久刪除垃圾桶中的 ${_trashCount} 筆圖表嗎？此操作無法復原。`)) return;
+  const deleteTargets = await getTrashedDiagramIds();
+  if (!deleteTargets.length) return;
+  if (!confirm(`確定要永久刪除垃圾桶中的 ${deleteTargets.length} 筆圖表嗎？此操作無法復原。`)) return;
   await permanentDeleteAllFromTrash();
 });
 
