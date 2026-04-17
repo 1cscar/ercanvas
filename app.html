@@ -7342,7 +7342,7 @@ document.getElementById('lm-btn-back-home').addEventListener('click', async ()=>
   }
   _currentEditorType = null; // Fix 10
   stopAllListeners();
-  returnToHomeAndRefresh();
+  window.location.href = '/';
 });
 document.getElementById('lm-btn-logout').addEventListener('click', _doLogout);
 
@@ -8491,7 +8491,7 @@ document.getElementById('pm-btn-back-home').addEventListener('click', async ()=>
   }
   _currentEditorType = null; // Fix 10
   stopAllListeners();
-  returnToHomeAndRefresh();
+  window.location.href = '/';
 });
 document.getElementById('pm-btn-logout').addEventListener('click', _doLogout);
 
@@ -8625,7 +8625,7 @@ document.getElementById('btn-back-home').addEventListener('click', async () => {
   }
   _currentEditorType = null; // Fix 10: clear before show('home')
   stopAllListeners();
-  returnToHomeAndRefresh();
+  window.location.href = '/';
 });
 
 // ── Physical Table (Relational) ───────────────────────────────────────────────
@@ -9166,7 +9166,7 @@ document.getElementById('pt-btn-back-home').addEventListener('click', async () =
   }
   _currentEditorType = null; // Fix 10
   stopAllListeners();
-  window.location.href = 'app.html';
+  window.location.href = '/';
 });
 document.getElementById('pt-btn-logout').addEventListener('click', _doLogout);
 
