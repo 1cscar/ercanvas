@@ -2418,7 +2418,7 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signO
                                from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js';
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
          doc, setDoc, getDoc, getDocFromServer, getDocs, addDoc, deleteDoc, updateDoc, onSnapshot,
-         collection, query, orderBy, serverTimestamp, deleteField }
+         collection, query, orderBy, serverTimestamp, deleteField, Timestamp }
                                from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js';
 import { getDatabase, ref as rref, set as rset, onValue, off as roff, remove as rremove }
                                from 'https://www.gstatic.com/firebasejs/11.6.0/firebase-database.js';
@@ -3873,8 +3873,13 @@ async function moveDiagramToTrash(id) {
   addPendingDelete(id, currentUser.uid);
   clearDirectPrefetch(id, currentUser.uid);
   try {
-    await updateDoc(doc(db, 'users', currentUser.uid, 'diagrams', id), { deletedAt: serverTimestamp() });
-    updateTrashBadge();
+    // Use a concrete local timestamp so Trash can reflect immediately without waiting for server timestamp resolution.
+    await updateDoc(doc(db, 'users', currentUser.uid, 'diagrams', id), {
+      deletedAt: Timestamp.now(),
+      updatedAt: serverTimestamp(),
+    });
+    await updateTrashBadge();
+    if (_homeActiveTab === 'trash') await loadTrash();
   } catch(e) {
     console.error('移至垃圾桶失敗:', e);
     // Roll back optimistic hide so the diagram is visible again.
