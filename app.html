@@ -1003,6 +1003,11 @@
         <h1 class="text-lg font-bold text-gray-900">我的圖表</h1>
         <span id="home-loading" class="text-xs text-gray-400 hidden">載入中…</span>
       </div>
+      <div id="home-recovery-bar" class="hidden items-center gap-2 mb-4 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-800">
+        <span id="home-recovery-text" class="text-xs font-medium">偵測到垃圾桶有圖表，可一鍵全部復原。</span>
+        <div class="flex-1"></div>
+        <button id="home-restore-all" class="text-xs font-semibold py-1.5 px-3 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer">全部復原</button>
+      </div>
 
       <!-- Grid -->
       <div id="home-grid" class="grid gap-4" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));"></div>
@@ -2417,6 +2422,7 @@ let _homeListener    = null;
 let _homeRenderSig   = '';
 let _homeGotServerSnapshot = false;
 let _lastExitFlushAt = 0;
+let _trashCount = 0;
 const PROJECTS_COLLECTION = 'diagrams';
 const AUTO_SAVE_DEBOUNCE_MS = 800; // Firestore checkpoint interval
 const RTDB_LIVE_THROTTLE_MS = 150; // live collaboration feel
@@ -3217,6 +3223,7 @@ function loadHomeFast() {
   _homeGotServerSnapshot = false;
   if (loading) loading.classList.remove('hidden');
   if (empty) empty.style.display = 'none';
+  updateHomeRecoveryBar();
 }
 
 // ── Home ──────────────────────────────────────────────────────────────────────
@@ -3266,9 +3273,14 @@ function loadHome() {
         _homeRenderSig = newSig;
         grid.innerHTML = '';
         const empty = document.getElementById('home-empty');
-        if (!docs.length) { empty.style.display = 'flex'; return; }
+        if (!docs.length) {
+          empty.style.display = 'flex';
+          updateHomeRecoveryBar();
+          return;
+        }
         empty.style.display = 'none';
         docs.forEach(({ id, data }) => renderDiagramCard(id, data));
+        updateHomeRecoveryBar();
       }
     },
     (error) => {
@@ -3277,6 +3289,7 @@ function loadHome() {
       if (loading) loading.classList.add('hidden');
       const empty = document.getElementById('home-empty');
       if (empty && !grid.children.length) empty.style.display = 'flex';
+      updateHomeRecoveryBar();
     }
   );
 }
@@ -3466,10 +3479,31 @@ async function updateTrashBadge() {
     const snaps = await getDocs(collection(db, 'users', currentUser.uid, 'diagrams'));
     let count = 0;
     snaps.forEach(s => { if (s.data().deletedAt) count++; });
+    _trashCount = count;
     const badge = document.getElementById('trash-count-badge');
     if (count > 0) { badge.textContent = count; badge.style.display = 'inline'; }
     else { badge.style.display = 'none'; }
+    updateHomeRecoveryBar();
   } catch(e) {}
+}
+
+function updateHomeRecoveryBar() {
+  const bar = document.getElementById('home-recovery-bar');
+  const text = document.getElementById('home-recovery-text');
+  const grid = document.getElementById('home-grid');
+  const trashView = document.getElementById('trash-view');
+  if (!bar || !text || !grid) return;
+  const homeVisible = grid.style.display !== 'none' && (!trashView || trashView.style.display === 'none');
+  const hasHomeCards = !!grid.children.length;
+  const shouldShow = homeVisible && !hasHomeCards && _trashCount > 0;
+  if (shouldShow) {
+    text.textContent = `偵測到垃圾桶有 ${_trashCount} 筆圖表，可一鍵全部復原。`;
+    bar.classList.remove('hidden');
+    bar.classList.add('flex');
+  } else {
+    bar.classList.remove('flex');
+    bar.classList.add('hidden');
+  }
 }
 
 async function loadTrash() {
@@ -3482,7 +3516,11 @@ async function loadTrash() {
     snaps.forEach(s => { if (s.data().deletedAt) trashed.push({ id: s.id, data: s.data() }); });
     if (!trashed.length) { empty.style.display = 'flex'; return; }
     empty.style.display = 'none';
-    trashed.forEach(({ id, data }) => renderTrashCard(id, data));
+    trashed.forEach(({ id, data }) => {
+      try { renderTrashCard(id, data); }
+      catch (err) { console.error('renderTrashCard error:', id, err); }
+    });
+    if (!grid.children.length) empty.style.display = 'flex';
   } catch(e) { console.error('loadTrash error:', e); }
 }
 
@@ -3572,6 +3610,12 @@ document.getElementById('trash-restore-all').addEventListener('click', async () 
   await restoreAllFromTrash();
 });
 
+document.getElementById('home-restore-all').addEventListener('click', async () => {
+  if (_trashCount <= 0) return;
+  if (!confirm(`確定要將垃圾桶中的 ${_trashCount} 筆圖表全部復原嗎？`)) return;
+  await restoreAllFromTrash();
+});
+
 document.getElementById('perm-delete-cancel').addEventListener('click', () => {
   document.getElementById('perm-delete-modal').style.display = 'none';
   _permDeleteTarget = null;
@@ -3594,6 +3638,7 @@ document.getElementById('nav-my-diagrams').addEventListener('click', () => {
   document.querySelector('main .flex.items-center.gap-3.mb-6 h1').textContent = '我的圖表';
   document.querySelector('main .flex.items-center.gap-3.mb-6 #home-loading').style.display = '';
   loadHomeFast(); loadHome();
+  updateHomeRecoveryBar();
 });
 
 document.getElementById('nav-trash').addEventListener('click', () => {
@@ -3603,6 +3648,7 @@ document.getElementById('nav-trash').addEventListener('click', () => {
   document.getElementById('home-empty').style.display = 'none';
   document.getElementById('trash-view').style.display = 'block';
   loadTrash();
+  updateHomeRecoveryBar();
 });
 
 // ── New diagram buttons ────────────────────────────────────────────────────────
