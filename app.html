@@ -2423,16 +2423,19 @@ let _homeRenderSig   = '';
 let _homeGotServerSnapshot = false;
 let _lastExitFlushAt = 0;
 let _trashCount = 0;
+let _homeCacheWaitStart = 0;
+let _homeLoadingGuardTimer = null;
 const PROJECTS_COLLECTION = 'diagrams';
+const LEGACY_PROJECTS_COLLECTION = 'projects';
 const AUTO_SAVE_DEBOUNCE_MS = 800; // Firestore checkpoint interval
 const RTDB_LIVE_THROTTLE_MS = 150; // live collaboration feel
 const _autoSaveTimers = new Map(); // slot -> { timer, lastRun, running, pending, job, delay }
 
-function projectCollectionRef(uid = currentUser?.uid) {
-  return collection(db, 'users', uid, PROJECTS_COLLECTION);
+function projectCollectionRef(uid = currentUser?.uid, collectionName = PROJECTS_COLLECTION) {
+  return collection(db, 'users', uid, collectionName);
 }
-function projectDocRef(uid, projectId) {
-  return doc(db, 'users', uid, PROJECTS_COLLECTION, projectId);
+function projectDocRef(uid, projectId, collectionName = PROJECTS_COLLECTION) {
+  return doc(db, 'users', uid, collectionName, projectId);
 }
 
 function autoSave(slot, job, delay = AUTO_SAVE_DEBOUNCE_MS) {
@@ -2569,28 +2572,62 @@ function flushOnExit() {
 
 async function fetchCanvas(projectId, ownerUid = currentUser?.uid) {
   if (!projectId || !ownerUid) return null;
-  const ref = projectDocRef(ownerUid, projectId);
-  const fromServer = getDocFromServer(ref)
-    .then(snap => (snap.exists() ? { id: projectId, ...snap.data() } : null))
-    .catch(() => null);
-  const fromCacheOrNetwork = getDoc(ref)
-    .then(snap => (snap.exists() ? { id: projectId, ...snap.data() } : null))
-    .catch(() => null);
+  const fetchFromCollection = async (collectionName) => {
+    const ref = projectDocRef(ownerUid, projectId, collectionName);
+    const fromServer = getDocFromServer(ref)
+      .then(snap => (snap.exists() ? { id: projectId, ...snap.data() } : null))
+      .catch(() => null);
+    const fromCacheOrNetwork = getDoc(ref)
+      .then(snap => (snap.exists() ? { id: projectId, ...snap.data() } : null))
+      .catch(() => null);
+    const fastResult = await Promise.race([
+      fromServer,
+      fromCacheOrNetwork,
+      new Promise(resolve => setTimeout(() => resolve(null), 800)),
+    ]);
+    if (fastResult) return fastResult;
+    const firstSettled = await Promise.race([fromServer, fromCacheOrNetwork]);
+    if (firstSettled) return firstSettled;
+    const [serverResult, cacheResult] = await Promise.all([fromServer, fromCacheOrNetwork]);
+    return serverResult || cacheResult || null;
+  };
 
-  const fastResult = await Promise.race([
-    fromServer,
-    fromCacheOrNetwork,
-    new Promise(resolve => setTimeout(() => resolve(null), 800)),
-  ]);
-  if (fastResult) return fastResult;
+  const primary = await fetchFromCollection(PROJECTS_COLLECTION);
+  if (primary) return primary;
+  if (LEGACY_PROJECTS_COLLECTION === PROJECTS_COLLECTION) return null;
 
-  // After quick path timeout, use whichever source resolves first.
-  // This avoids being blocked on getDocFromServer when cache/network already has data.
-  const firstSettled = await Promise.race([fromServer, fromCacheOrNetwork]);
-  if (firstSettled) return firstSettled;
+  const legacy = await fetchFromCollection(LEGACY_PROJECTS_COLLECTION);
+  if (!legacy) return null;
 
-  const [serverResult, cacheResult] = await Promise.all([fromServer, fromCacheOrNetwork]);
-  return serverResult || cacheResult || null;
+  // Lazy migrate old documents so next load path is unified.
+  setDoc(projectDocRef(ownerUid, projectId, PROJECTS_COLLECTION), legacy, { merge: true }).catch(() => {});
+  return legacy;
+}
+
+async function migrateLegacyProjectsIfNeeded(uid) {
+  if (!uid) return;
+  if (LEGACY_PROJECTS_COLLECTION === PROJECTS_COLLECTION) return;
+  const doneKey = `er_legacy_migrated_${uid}_v2`;
+  try {
+    if (localStorage.getItem(doneKey) === '1') return;
+  } catch(_) {}
+  try {
+    const [legacySnaps, newSnaps] = await Promise.all([
+      getDocs(projectCollectionRef(uid, LEGACY_PROJECTS_COLLECTION)),
+      getDocs(projectCollectionRef(uid, PROJECTS_COLLECTION)),
+    ]);
+    const existing = new Set(newSnaps.docs.map(s => s.id));
+    const writes = [];
+    legacySnaps.forEach(s => {
+      if (!existing.has(s.id)) {
+        writes.push(setDoc(projectDocRef(uid, s.id, PROJECTS_COLLECTION), s.data(), { merge: true }));
+      }
+    });
+    if (writes.length) await Promise.all(writes);
+    try { localStorage.setItem(doneKey, '1'); } catch(_) {}
+  } catch (e) {
+    console.error('legacy migration failed:', e);
+  }
 }
 
 const CURSOR_COLORS = ['#f43f5e','#f97316','#eab308','#22c55e','#06b6d4','#8b5cf6','#ec4899'];
@@ -3037,7 +3074,7 @@ function boot() {
   try {
     initFirebaseModule();
   } catch(e) { show('setup'); return; }
-  watchAuthState(user => {
+  watchAuthState(async user => {
     if (user) {
       currentUser = user;
       // Persist session for next cold start
@@ -3046,6 +3083,7 @@ function boot() {
         email: user.email, photoURL: user.photoURL
       })); } catch(e) {}
       applyUserUI(user);
+      await migrateLegacyProjectsIfNeeded(user.uid);
       // Check URL params for direct diagram open
       const directId = _urlParams.get('id');
       const directType = _urlParams.get('type');
@@ -3218,11 +3256,29 @@ function loadHomeFast() {
   const empty = document.getElementById('home-empty');
   const loading = document.getElementById('home-loading');
   if (!grid) return;
+  if (_homeLoadingGuardTimer) {
+    clearTimeout(_homeLoadingGuardTimer);
+    _homeLoadingGuardTimer = null;
+  }
   grid.innerHTML = '';
   _homeRenderSig = '';
   _homeGotServerSnapshot = false;
+  _homeCacheWaitStart = Date.now();
+  const guardStart = _homeCacheWaitStart;
   if (loading) loading.classList.remove('hidden');
   if (empty) empty.style.display = 'none';
+  _homeLoadingGuardTimer = setTimeout(() => {
+    if (_homeCacheWaitStart !== guardStart) return;
+    const loadingEl = document.getElementById('home-loading');
+    if (!loadingEl || loadingEl.classList.contains('hidden')) return;
+    if (_homeGotServerSnapshot) return;
+    // Cache-only empty snapshots can loop forever on some clients; fail open.
+    loadingEl.classList.add('hidden');
+    const gridEl = document.getElementById('home-grid');
+    const emptyEl = document.getElementById('home-empty');
+    if (emptyEl && (!gridEl || !gridEl.children.length)) emptyEl.style.display = 'flex';
+    updateHomeRecoveryBar();
+  }, 4500);
   updateHomeRecoveryBar();
 }
 
@@ -3239,7 +3295,14 @@ function loadHome() {
     { includeMetadataChanges: true },
     (snaps) => {
       const fromCache = snaps.metadata.fromCache;
-      if (!fromCache) _homeGotServerSnapshot = true;
+      if (!fromCache) {
+        _homeGotServerSnapshot = true;
+        _homeCacheWaitStart = 0;
+        if (_homeLoadingGuardTimer) {
+          clearTimeout(_homeLoadingGuardTimer);
+          _homeLoadingGuardTimer = null;
+        }
+      }
       const docs = [];
       snaps.forEach(s => {
         const d = s.data();
@@ -3268,6 +3331,11 @@ function loadHome() {
       docs.sort((a, b) => (b.data.updatedAt?.toMillis?.() ?? 0) - (a.data.updatedAt?.toMillis?.() ?? 0));
       const loading = document.getElementById('home-loading');
       if (loading) loading.classList.add('hidden');
+      if (_homeLoadingGuardTimer) {
+        clearTimeout(_homeLoadingGuardTimer);
+        _homeLoadingGuardTimer = null;
+      }
+      _homeCacheWaitStart = 0;
       const newSig = docs.map(({ id, data }) => `${id}:${data.updatedAt?.toMillis?.() ?? 0}:${data.name || ''}`).join('|');
       if (_homeRenderSig !== newSig) {
         _homeRenderSig = newSig;
@@ -3285,6 +3353,11 @@ function loadHome() {
     },
     (error) => {
       console.error('loadHome listener error:', error);
+      if (_homeLoadingGuardTimer) {
+        clearTimeout(_homeLoadingGuardTimer);
+        _homeLoadingGuardTimer = null;
+      }
+      _homeCacheWaitStart = 0;
       const loading = document.getElementById('home-loading');
       if (loading) loading.classList.add('hidden');
       const empty = document.getElementById('home-empty');
