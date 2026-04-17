@@ -3365,25 +3365,27 @@ document.getElementById('btn-logout').addEventListener('click', () => signOut(au
 document.getElementById('home-logout').addEventListener('click', () => signOut(auth).then(() => show('login')));
 
 // ── Local cache helpers ───────────────────────────────────────────────────────
-function pendingDelKey() { return 'er_pending_del_' + currentUser.uid; }
+function pendingDelKey(uid = currentUser?.uid) { return 'er_pending_del_' + (uid || 'anon'); }
 
 let _pendingDeletes = null; // in-memory cache, loaded on first use
+let _pendingDeleteUid = null;
 
-function getPendingDeletes() {
-  if (_pendingDeletes) return _pendingDeletes;
-  try { _pendingDeletes = new Set(JSON.parse(localStorage.getItem(pendingDelKey()) || '[]')); }
+function getPendingDeletes(uid = currentUser?.uid) {
+  if (_pendingDeletes && _pendingDeleteUid === (uid || 'anon')) return _pendingDeletes;
+  _pendingDeleteUid = uid || 'anon';
+  try { _pendingDeletes = new Set(JSON.parse(localStorage.getItem(pendingDelKey(uid)) || '[]')); }
   catch(e) { _pendingDeletes = new Set(); }
   return _pendingDeletes;
 }
-function addPendingDelete(id) {
-  const pending = getPendingDeletes();
+function addPendingDelete(id, uid = currentUser?.uid) {
+  const pending = getPendingDeletes(uid);
   pending.add(id);
-  try { localStorage.setItem(pendingDelKey(), JSON.stringify([...pending])); } catch(e) {}
+  try { localStorage.setItem(pendingDelKey(uid), JSON.stringify([...pending])); } catch(e) {}
 }
-function removePendingDelete(id) {
-  const pending = getPendingDeletes();
+function removePendingDelete(id, uid = currentUser?.uid) {
+  const pending = getPendingDeletes(uid);
   pending.delete(id);
-  try { localStorage.setItem(pendingDelKey(), JSON.stringify([...pending])); } catch(e) {}
+  try { localStorage.setItem(pendingDelKey(uid), JSON.stringify([...pending])); } catch(e) {}
 }
 
 const DIRECT_PREFETCH_TTL_MS = 10 * 60 * 1000;
@@ -3456,6 +3458,10 @@ function saveDirectPrefetch(id, data, uid = currentUser?.uid) {
   if (!payload) return;
   try { sessionStorage.setItem(directPrefetchKey(uid, id), JSON.stringify(payload)); } catch(_) {}
 }
+function clearDirectPrefetch(id, uid = currentUser?.uid) {
+  if (!uid || !id) return;
+  try { sessionStorage.removeItem(directPrefetchKey(uid, id)); } catch(_) {}
+}
 function loadDirectPrefetch(id, uid = currentUser?.uid) {
   if (!uid || !id) return null;
   try {
@@ -3471,6 +3477,7 @@ function loadDirectPrefetch(id, uid = currentUser?.uid) {
 function loadHomeSeedDocs(uid = currentUser?.uid) {
   if (!uid) return [];
   const docs = [];
+  const pendingDeletes = getPendingDeletes(uid);
   const prefix = `er_direct_prefetch_${uid}_`;
   try {
     for (let i = 0; i < sessionStorage.length; i++) {
@@ -3482,9 +3489,12 @@ function loadHomeSeedDocs(uid = currentUser?.uid) {
       if (!parsed || typeof parsed !== 'object') continue;
       const cacheAge = Date.now() - (parsed.cachedAtMs || 0);
       if (parsed.cachedAtMs && cacheAge > HOME_PREFETCH_MAX_AGE_MS) continue;
+      const id = parsed.id || key.slice(prefix.length);
+      if (pendingDeletes.has(id)) continue;
       const normalized = normalizeDiagramDoc(parsed);
+      if (normalized?.deletedAt) continue;
       if (!isRenderableDiagramDoc(normalized)) continue;
-      docs.push({ id: parsed.id || key.slice(prefix.length), data: normalized });
+      docs.push({ id, data: normalized });
     }
   } catch(_) {}
   docs.sort((a, b) => homeDocUpdatedMs(b.data) - homeDocUpdatedMs(a.data));
@@ -3589,7 +3599,7 @@ function loadHome() {
   if (!grid) return;
   loadHomeFast();
   if (_homeListener) { _homeListener(); _homeListener = null; }
-  const pendingDeletes = getPendingDeletes();
+  const pendingDeletes = getPendingDeletes(currentUser.uid);
 
   _homeListener = onSnapshot(
     projectCollectionRef(currentUser.uid),
@@ -3610,14 +3620,15 @@ function loadHome() {
         const isPendingDelete = pendingDeletes.has(s.id);
         if (d.deletedAt) {
           // Pending delete completed on server; clear local optimistic marker.
-          if (isPendingDelete) removePendingDelete(s.id);
+          if (isPendingDelete) removePendingDelete(s.id, currentUser.uid);
+          clearDirectPrefetch(s.id, currentUser?.uid);
           return;
         }
         if (isPendingDelete) {
           // Keep optimistic hide only while we're still waiting for first server snapshot.
           if (fromCache && !_homeGotServerSnapshot) return;
           // Server confirms doc is not deleted, so local pending marker is stale.
-          removePendingDelete(s.id);
+          removePendingDelete(s.id, currentUser.uid);
         }
         if (!isRenderableDiagramDoc(d)) return;
         const normalized = normalizeDiagramDoc(d);
@@ -3859,15 +3870,15 @@ async function openDiagram(id, data) {
 let _permDeleteTarget = null; // { id, name }
 
 async function moveDiagramToTrash(id) {
-  addPendingDelete(id);
+  addPendingDelete(id, currentUser.uid);
+  clearDirectPrefetch(id, currentUser.uid);
   try {
     await updateDoc(doc(db, 'users', currentUser.uid, 'diagrams', id), { deletedAt: serverTimestamp() });
-    removePendingDelete(id);
     updateTrashBadge();
   } catch(e) {
     console.error('移至垃圾桶失敗:', e);
     // Roll back optimistic hide so the diagram is visible again.
-    removePendingDelete(id);
+    removePendingDelete(id, currentUser.uid);
     loadHome();
     updateTrashBadge();
     alert('移至垃圾桶失敗，圖表已復原。請稍後再試。');
@@ -3951,6 +3962,7 @@ async function permanentDeleteAllFromTrash() {
   try {
     const deleteTargets = await getTrashedDiagramIds();
     if (!deleteTargets.length) return 0;
+    deleteTargets.forEach(id => clearDirectPrefetch(id, currentUser.uid));
     const results = await Promise.allSettled(
       deleteTargets.map(id => deleteDoc(doc(db, 'users', currentUser.uid, 'diagrams', id)))
     );
@@ -4003,6 +4015,7 @@ function renderTrashCard(id, data) {
 
 async function restoreDiagram(id) {
   try {
+    removePendingDelete(id, currentUser.uid);
     await updateDoc(doc(db, 'users', currentUser.uid, 'diagrams', id), { deletedAt: deleteField() });
     document.querySelector(`#trash-grid [data-id="${id}"]`)?.remove();
     if (!document.getElementById('trash-grid').children.length)
@@ -4013,6 +4026,7 @@ async function restoreDiagram(id) {
 
 async function permanentDeleteDiagram(id) {
   try {
+    clearDirectPrefetch(id, currentUser.uid);
     await deleteDoc(doc(db, 'users', currentUser.uid, 'diagrams', id));
     document.querySelector(`#trash-grid [data-id="${id}"]`)?.remove();
     if (!document.getElementById('trash-grid').children.length)
