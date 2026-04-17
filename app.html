@@ -2671,10 +2671,9 @@ async function migrateLegacyProjectsIfNeeded(uid) {
       const currentData = existing.get(s.id);
       const shouldCreate = !currentData;
       const shouldRepair = !!currentData && !isRenderableDiagramDoc(currentData) && isRenderableDiagramDoc(legacyData);
-      const shouldUndelete = !!currentData?.deletedAt && !legacyData?.deletedAt;
-      if (shouldCreate || shouldRepair || shouldUndelete) {
-        const payload = shouldUndelete ? { ...legacyData, deletedAt: deleteField() } : legacyData;
-        writes.push(setDoc(projectDocRef(uid, s.id, PROJECTS_COLLECTION), payload, { merge: true }));
+      // Never force-undelete here; keep Trash state as source of truth.
+      if (shouldCreate || shouldRepair) {
+        writes.push(setDoc(projectDocRef(uid, s.id, PROJECTS_COLLECTION), legacyData, { merge: true }));
       }
     });
     if (writes.length) await Promise.all(writes);
@@ -2819,7 +2818,9 @@ async function recoverLegacyLocalDiagramsIfNeeded(uid) {
       const missing = !current;
       const broken = !!current && !isRenderableDiagramDoc(current);
       const deleted = !!current?.deletedAt;
-      if (missing || broken || deleted) {
+      // Do not recover over a trashed diagram; keep deleted docs in Trash.
+      if (deleted) return;
+      if (missing || broken) {
         writes.push(setDoc(projectDocRef(uid, entry.id, PROJECTS_COLLECTION), payload, { merge: true }));
       }
     });
