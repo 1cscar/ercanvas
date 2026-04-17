@@ -3517,7 +3517,10 @@ function loadHome() {
           return;
         }
         empty.style.display = 'none';
-        docs.forEach(({ id, data }) => renderDiagramCard(id, data));
+        docs.forEach(({ id, data }) => {
+          try { renderDiagramCard(id, data); }
+          catch (err) { console.error('renderDiagramCard error:', id, err); }
+        });
         updateHomeRecoveryBar();
       }
     },
@@ -3613,10 +3616,12 @@ function renderDiagramCard(id, data) {
 }
 
 function buildPreviewSVG(nodes, edges) {
-  if (!nodes.length) return '<svg width="100" height="80" viewBox="0 0 100 80"><text x="50" y="44" text-anchor="middle" font-size="11" fill="#cbd5e1">空白圖表</text></svg>';
+  const safeNodes = Array.isArray(nodes) ? nodes.filter(n => n && typeof n === 'object') : [];
+  const safeEdges = Array.isArray(edges) ? edges.filter(e => e && typeof e === 'object') : [];
+  if (!safeNodes.length) return '<svg width="100" height="80" viewBox="0 0 100 80"><text x="50" y="44" text-anchor="middle" font-size="11" fill="#cbd5e1">空白圖表</text></svg>';
   // Compute bounding box
   let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
-  nodes.forEach(n => {
+  safeNodes.forEach(n => {
     const cx = (n.type==='entity'||n.type==='weak-entity'||n.type==='aggregation') ? n.x+n.w/2 : n.x;
     const cy = (n.type==='entity'||n.type==='weak-entity'||n.type==='aggregation') ? n.y+n.h/2 : n.y;
     const hw = n.w/2||n.rx||n.hw||30, hh = n.h/2||n.ry||n.hh||20;
@@ -3627,15 +3632,15 @@ function buildPreviewSVG(nodes, edges) {
   const scl = Math.min((W-pad*2)/(x1-x0||1),(H-pad*2)/(y1-y0||1));
   const tx = (W-(x0+x1)*scl)/2, ty = (H-(y0+y1)*scl)/2;
   let shapes = '';
-  edges.forEach(e => {
-    const f=nodes.find(n=>n.id===e.from), t=nodes.find(n=>n.id===e.to); if(!f||!t) return;
+  safeEdges.forEach(e => {
+    const f=safeNodes.find(n=>n.id===e.from), t=safeNodes.find(n=>n.id===e.to); if(!f||!t) return;
     const fx=(f.type==='entity'||f.type==='weak-entity'||f.type==='aggregation')?f.x+f.w/2:f.x;
     const fy=(f.type==='entity'||f.type==='weak-entity'||f.type==='aggregation')?f.y+f.h/2:f.y;
     const tx2=(t.type==='entity'||t.type==='weak-entity'||t.type==='aggregation')?t.x+t.w/2:t.x;
     const ty2=(t.type==='entity'||t.type==='weak-entity'||t.type==='aggregation')?t.y+t.h/2:t.y;
     shapes += `<line x1="${fx*scl+tx}" y1="${fy*scl+ty}" x2="${tx2*scl+tx}" y2="${ty2*scl+ty}" stroke="#cbd5e1" stroke-width="1"/>`;
   });
-  nodes.forEach(n => {
+  safeNodes.forEach(n => {
     const cx=(n.type==='entity'||n.type==='weak-entity')?n.x+n.w/2:n.x;
     const cy=(n.type==='entity'||n.type==='weak-entity')?n.y+n.h/2:n.y;
     const sx=cx*scl+tx, sy=cy*scl+ty;
@@ -3654,20 +3659,36 @@ function buildPreviewSVG(nodes, edges) {
 
 function buildLogicalPreviewSVG(tables) {
   const W=160, H=112, pad=10;
-  if (!tables.length) return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="11" fill="#cbd5e1">空白邏輯模型</text></svg>`;
+  const safeTables = Array.isArray(tables) ? tables.filter(t => t && typeof t === 'object') : [];
+  if (!safeTables.length) return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="11" fill="#cbd5e1">空白邏輯模型</text></svg>`;
+  const colCount = (t) => {
+    if (Array.isArray(t?.columns)) return Math.max(1, t.columns.length);
+    if (Array.isArray(t?.fields)) return Math.max(1, t.fields.length);
+    if (Array.isArray(t?.attrs)) return Math.max(1, t.attrs.length);
+    return 1;
+  };
+  const txSafe = (v) => Number.isFinite(v) ? v : 0;
+  const tySafe = (v) => Number.isFinite(v) ? v : 0;
   let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
-  tables.forEach(t=>{const tw=Math.max(60,t.columns.length*48);x0=Math.min(x0,t.x);y0=Math.min(y0,t.y);x1=Math.max(x1,t.x+tw);y1=Math.max(y1,t.y+28);});
+  safeTables.forEach(t=>{
+    const n = colCount(t);
+    const tw=Math.max(60,n*48);
+    const x = txSafe(t.x), y = tySafe(t.y);
+    x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x+tw);y1=Math.max(y1,y+28);
+  });
   const scl=Math.min((W-pad*2)/(x1-x0||1),(H-pad*2)/(y1-y0||1));
   const tx=(W-(x0+x1)*scl)/2, ty=(H-(y0+y1)*scl)/2;
   let shapes='';
-  tables.forEach(t=>{
-    const tw=Math.max(60,t.columns.length*48)*scl, th=28*scl;
-    const rx=t.x*scl+tx, ry=t.y*scl+ty;
+  safeTables.forEach(t=>{
+    const n = colCount(t);
+    const tw=Math.max(60,n*48)*scl, th=28*scl;
+    const x = txSafe(t.x), y = tySafe(t.y);
+    const rx=x*scl+tx, ry=y*scl+ty;
     shapes+=`<rect x="${rx}" y="${ry}" width="${tw}" height="${th}" fill="white" stroke="#9ca3af" stroke-width="1" rx="1"/>`;
-    t.columns.forEach((c,i)=>{
-      const cw=tw/t.columns.length, cx2=rx+i*cw;
-      if(i>0) shapes+=`<line x1="${cx2}" y1="${ry}" x2="${cx2}" y2="${ry+th}" stroke="#d1d5db" stroke-width="0.8"/>`;
-    });
+    for (let i = 1; i < n; i++) {
+      const cw=tw/n, cx2=rx+i*cw;
+      shapes+=`<line x1="${cx2}" y1="${ry}" x2="${cx2}" y2="${ry+th}" stroke="#d1d5db" stroke-width="0.8"/>`;
+    }
   });
   return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${shapes}</svg>`;
 }
