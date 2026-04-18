@@ -33,6 +33,7 @@ let logicBoundsRect = null
 const elements = shallowRef([])
 
 let resizeHandler = null
+let panState = null
 
 function clamp(v, min, max) {
   return Math.max(min, Math.min(max, v))
@@ -173,20 +174,36 @@ function onWheelZoomAtPointer(e) {
 function onPointerDown(e) {
   if (!stage) return
   const target = e.target
-  // 只有點到空白背景時才顯示拖曳游標（實際平移交給 worldLayer.dragmove）。
   const hitBackground = target === stage || target === logicBoundsRect
   if (!hitBackground) return
 
+  const pos = stage.getPointerPosition()
+  if (!pos) return
+  panState = {
+    startPointer: { x: pos.x, y: pos.y },
+    startLayer: { x: worldLayer.x(), y: worldLayer.y() },
+  }
   stage.container().style.cursor = 'grabbing'
 }
 
-function onPointerMove() {
-  // 平移由 worldLayer.dragmove 主導，這裡保留介面避免事件綁定改動。
+function onPointerMove(e) {
+  if (!panState || !stage || !worldLayer) return
+  e.evt.preventDefault()
+  const pos = stage.getPointerPosition()
+  if (!pos) return
+  worldLayer.position({
+    x: panState.startLayer.x + (pos.x - panState.startPointer.x),
+    y: panState.startLayer.y + (pos.y - panState.startPointer.y),
+  })
+  throttledCull()
+  updateViewportMeta()
+  requestLayerDraw()
 }
 
 function onPointerUp() {
-  if (stage?.container()) {
-    stage.container().style.cursor = 'grab'
+  if (panState) {
+    panState = null
+    if (stage?.container()) stage.container().style.cursor = 'grab'
   }
 }
 
@@ -239,6 +256,7 @@ function clearObjects() {
 }
 
 function destroyStage() {
+  panState = null
   if (stage) {
     stage.destroy()
     stage = null
@@ -312,25 +330,6 @@ function initStage() {
   stage.on('mousemove touchmove', onPointerMove)
   stage.on('mouseup touchend touchcancel', onPointerUp)
   stage.on('click tap', onStageClick)
-
-  // 使用 Konva dragmove 作為平移主事件，並套節流剔除
-  worldLayer.draggable(true)
-  worldLayer.on('dragstart', (evt) => {
-    // 僅允許拖曳空白背景；若抓到物件則取消拖曳。
-    if (evt.target !== logicBoundsRect) {
-      worldLayer.stopDrag()
-      return
-    }
-    stage.container().style.cursor = 'grabbing'
-  })
-  worldLayer.on('dragmove', () => {
-    throttledCull()
-    updateViewportMeta()
-    requestLayerDraw()
-  })
-  worldLayer.on('dragend', () => {
-    stage.container().style.cursor = 'grab'
-  })
 
   stage.container().style.cursor = 'grab'
 
