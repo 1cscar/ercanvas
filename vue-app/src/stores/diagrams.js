@@ -138,6 +138,32 @@ export const useDiagramsStore = defineStore('diagrams', () => {
       .sort((a, b) => toMs(b.deletedAt) - toMs(a.deletedAt))
   )
 
+  function snapshotDiagrams() {
+    return JSON.parse(JSON.stringify(diagrams.value))
+  }
+
+  function restoreDiagrams(snapshot) {
+    diagrams.value = snapshot
+  }
+
+  function patchDiagram(id, patch) {
+    diagrams.value = diagrams.value.map((diagram) => (
+      diagram.id === id ? { ...diagram, ...patch } : diagram
+    ))
+  }
+
+  function patchDiagramsByIds(ids, patch) {
+    const idSet = new Set(ids)
+    diagrams.value = diagrams.value.map((diagram) => (
+      idSet.has(diagram.id) ? { ...diagram, ...patch } : diagram
+    ))
+  }
+
+  function removeDiagramsByIds(ids) {
+    const idSet = new Set(ids)
+    diagrams.value = diagrams.value.filter((diagram) => !idSet.has(diagram.id))
+  }
+
   async function createDiagram(uid, type) {
     const payload = createDiagramInsert(uid, type)
 
@@ -171,19 +197,28 @@ export const useDiagramsStore = defineStore('diagrams', () => {
   }
 
   async function trash(uid, id) {
+    const snapshot = snapshotDiagrams()
+    const nowIso = new Date().toISOString()
+    patchDiagram(id, { deletedAt: nowIso, updatedAt: nowIso })
     const { error } = await withQueryTimeout(
       supabase
         .from('diagrams')
-        .update({ deleted_at: new Date().toISOString() })
+        .update({ deleted_at: nowIso })
         .eq('owner_id', uid)
         .eq('id', id),
       '移至垃圾桶逾時，請稍後重試。',
     )
 
-    if (error) throw error
+    if (error) {
+      restoreDiagrams(snapshot)
+      throw error
+    }
   }
 
   async function restore(uid, id) {
+    const snapshot = snapshotDiagrams()
+    const nowIso = new Date().toISOString()
+    patchDiagram(id, { deletedAt: null, updatedAt: nowIso })
     const { error } = await withQueryTimeout(
       supabase
         .from('diagrams')
@@ -193,10 +228,15 @@ export const useDiagramsStore = defineStore('diagrams', () => {
       '還原圖表逾時，請稍後重試。',
     )
 
-    if (error) throw error
+    if (error) {
+      restoreDiagrams(snapshot)
+      throw error
+    }
   }
 
   async function permDelete(uid, id) {
+    const snapshot = snapshotDiagrams()
+    removeDiagramsByIds([id])
     const { error } = await withQueryTimeout(
       supabase
         .from('diagrams')
@@ -206,10 +246,16 @@ export const useDiagramsStore = defineStore('diagrams', () => {
       '刪除圖表逾時，請稍後重試。',
     )
 
-    if (error) throw error
+    if (error) {
+      restoreDiagrams(snapshot)
+      throw error
+    }
   }
 
   async function rename(uid, id, name) {
+    const snapshot = snapshotDiagrams()
+    const nowIso = new Date().toISOString()
+    patchDiagram(id, { name, updatedAt: nowIso })
     const { error } = await withQueryTimeout(
       supabase
         .from('diagrams')
@@ -219,7 +265,10 @@ export const useDiagramsStore = defineStore('diagrams', () => {
       '重新命名逾時，請稍後重試。',
     )
 
-    if (error) throw error
+    if (error) {
+      restoreDiagrams(snapshot)
+      throw error
+    }
   }
 
   async function saveDiagram(uid, diagram) {
@@ -250,22 +299,31 @@ export const useDiagramsStore = defineStore('diagrams', () => {
   async function trashAll(uid) {
     const ids = myDiagrams.value.map(d => d.id)
     if (!ids.length) return
+    const snapshot = snapshotDiagrams()
+    const nowIso = new Date().toISOString()
+    patchDiagramsByIds(ids, { deletedAt: nowIso, updatedAt: nowIso })
 
     const { error } = await withQueryTimeout(
       supabase
         .from('diagrams')
-        .update({ deleted_at: new Date().toISOString() })
+        .update({ deleted_at: nowIso })
         .eq('owner_id', uid)
         .in('id', ids),
       '批次移至垃圾桶逾時，請稍後重試。',
     )
 
-    if (error) throw error
+    if (error) {
+      restoreDiagrams(snapshot)
+      throw error
+    }
   }
 
   async function restoreAll(uid) {
     const ids = trashedDiagrams.value.map(d => d.id)
     if (!ids.length) return
+    const snapshot = snapshotDiagrams()
+    const nowIso = new Date().toISOString()
+    patchDiagramsByIds(ids, { deletedAt: null, updatedAt: nowIso })
 
     const { error } = await withQueryTimeout(
       supabase
@@ -276,12 +334,17 @@ export const useDiagramsStore = defineStore('diagrams', () => {
       '批次還原逾時，請稍後重試。',
     )
 
-    if (error) throw error
+    if (error) {
+      restoreDiagrams(snapshot)
+      throw error
+    }
   }
 
   async function permDeleteAll(uid) {
     const ids = trashedDiagrams.value.map(d => d.id)
     if (!ids.length) return
+    const snapshot = snapshotDiagrams()
+    removeDiagramsByIds(ids)
 
     const { error } = await withQueryTimeout(
       supabase
@@ -292,7 +355,10 @@ export const useDiagramsStore = defineStore('diagrams', () => {
       '批次永久刪除逾時，請稍後重試。',
     )
 
-    if (error) throw error
+    if (error) {
+      restoreDiagrams(snapshot)
+      throw error
+    }
   }
 
   return {

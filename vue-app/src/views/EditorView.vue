@@ -6,6 +6,7 @@ import ErDiagramEditor from '@/components/editor/ErDiagramEditor.vue'
 import TableModelEditor from '@/components/editor/TableModelEditor.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useDiagramsStore } from '@/stores/diagrams'
+import { convertErToLogical } from '@/domain/converters/erToLogical'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,6 +18,11 @@ const loadError = ref('')
 const saveError = ref('')
 const saveState = ref('idle') // idle | dirty | saving | saved | error
 const draft = ref(null)
+const sharePanelOpen = ref(false)
+const sharePermission = ref('edit') // owner_only | read | edit
+const shareCopyState = ref('')
+const convertState = ref('idle') // idle | converting | error
+const convertError = ref('')
 let autosaveTimer = null
 
 const diagramId = computed(() => String(route.query.id || ''))
@@ -44,9 +50,16 @@ function normalizeEditorType(type) {
 const editorType = computed(() => normalizeEditorType(draft.value?.type || fallbackType.value))
 
 const subtitle = computed(() => {
-  if (shareId.value) return `分享模式：${shareId.value}`
+  if (shareId.value) return `分享來源：${shareId.value}`
   if (!diagramId.value) return '尚未指定圖表 ID'
   return `圖表 ID：${diagramId.value}`
+})
+
+const shareLink = computed(() => {
+  if (!diagramId.value) return ''
+  if (typeof window === 'undefined') return ''
+  const base = `${window.location.origin}/editor?id=${diagramId.value}&type=${editorType.value}`
+  return `${base}&share=link&perm=${sharePermission.value}`
 })
 
 const saveStatusText = computed(() => {
@@ -115,12 +128,6 @@ async function loadDiagram() {
     loadError.value = '缺少圖表 ID，請回到圖表列表重新開啟。'
     return
   }
-  if (shareId.value) {
-    draft.value = null
-    loadError.value = '新版 Vue 編輯器尚未開放 share query，請從圖表列表進入。'
-    return
-  }
-
   loading.value = true
   try {
     const row = await diagrams.fetchDiagram(auth.user.uid, diagramId.value)
@@ -138,6 +145,9 @@ async function loadDiagram() {
       linkedErDiagramId: row.linkedErDiagramId ?? null,
       linkedLmDiagramId: row.linkedLmDiagramId ?? null,
     }
+    sharePermission.value = String(row.content?.shareConfig?.permission || 'edit')
+    sharePanelOpen.value = false
+    shareCopyState.value = ''
     saveState.value = 'idle'
   } catch (error) {
     draft.value = null
@@ -157,6 +167,78 @@ function updateDiagramContent(content) {
   if (!draft.value) return
   draft.value.content = deepClone(content || {})
   markDirty()
+}
+
+function toggleSharePanel() {
+  sharePanelOpen.value = !sharePanelOpen.value
+  shareCopyState.value = ''
+}
+
+function updateSharePermission(permission) {
+  if (!draft.value) return
+  sharePermission.value = permission
+  draft.value.content = {
+    ...(draft.value.content || {}),
+    shareConfig: {
+      ...((draft.value.content || {}).shareConfig || {}),
+      permission,
+    },
+  }
+  markDirty()
+}
+
+async function copyShareLink() {
+  if (!shareLink.value) return
+  try {
+    await navigator.clipboard.writeText(shareLink.value)
+    shareCopyState.value = '已複製'
+  } catch (_) {
+    shareCopyState.value = '複製失敗'
+  }
+}
+
+async function convertToLogical() {
+  if (!draft.value || editorType.value !== 'er' || !auth.user?.uid || convertState.value === 'converting') return
+  convertState.value = 'converting'
+  convertError.value = ''
+  try {
+    const converted = convertErToLogical({
+      nodes: draft.value.content?.nodes || [],
+      edges: draft.value.content?.edges || [],
+      nextId: draft.value.content?.nextId || 1,
+      existingTables: [],
+    })
+
+    const logicalId = await diagrams.createDiagram(auth.user.uid, 'logical')
+
+    await diagrams.saveDiagram(auth.user.uid, {
+      id: logicalId,
+      type: 'logical',
+      name: `${draft.value.name || '未命名圖表'}-邏輯`,
+      content: {
+        tables: converted.tables || [],
+        fkLinks: [],
+        nextId: converted.nextId || 1,
+        linkedErDiagramId: draft.value.id,
+      },
+      linkedErDiagramId: draft.value.id,
+      linkedLmDiagramId: null,
+    })
+
+    draft.value.linkedLmDiagramId = logicalId
+    draft.value.content = {
+      ...(draft.value.content || {}),
+      linkedLmDiagramId: logicalId,
+    }
+    await saveNow(true)
+
+    await router.push(`/editor?id=${logicalId}&type=logical`)
+  } catch (error) {
+    convertState.value = 'error'
+    convertError.value = error?.message || 'ER 轉邏輯圖失敗'
+    return
+  }
+  convertState.value = 'idle'
 }
 
 function goHome() {
@@ -188,8 +270,10 @@ onBeforeUnmount(() => {
       :subtitle="subtitle"
       :mode-label="modeLabelMap[editorType] || editorType"
       :disable-reload="loading"
+      :disable-share="loading || !draft"
       @back="goHome"
       @reload="reloadDiagram"
+      @share="toggleSharePanel"
     />
 
     <main class="editor-main">
@@ -212,6 +296,14 @@ onBeforeUnmount(() => {
 
           <div class="meta-actions">
             <span class="save-status" :class="saveStatusClass">{{ saveStatusText }}</span>
+            <button
+              v-if="editorType === 'er'"
+              class="save-btn"
+              :disabled="convertState === 'converting'"
+              @click="convertToLogical"
+            >
+              {{ convertState === 'converting' ? '轉換中...' : 'ER 轉邏輯圖' }}
+            </button>
             <button class="save-btn" :disabled="saveState === 'saving'" @click="saveNow(true)">
               立即儲存
             </button>
@@ -219,6 +311,27 @@ onBeforeUnmount(() => {
         </section>
 
         <p v-if="saveError" class="save-error">{{ saveError }}</p>
+        <p v-if="convertError" class="save-error">{{ convertError }}</p>
+
+        <section v-if="sharePanelOpen" class="share-panel">
+          <div class="share-row">
+            <label>權限</label>
+            <select :value="sharePermission" @change="updateSharePermission($event.target.value)">
+              <option value="owner_only">僅自己</option>
+              <option value="read">僅檢視</option>
+              <option value="edit">可編輯</option>
+            </select>
+          </div>
+          <div class="share-row">
+            <label>分享連結</label>
+            <input :value="shareLink" readonly />
+            <button class="save-btn" @click="copyShareLink">複製連結</button>
+          </div>
+          <p class="share-tip">
+            目前權限設定會存入圖表內容。若要真正跨帳號協作，需再加 Supabase share policy / token 機制。
+            <span v-if="shareCopyState">（{{ shareCopyState }}）</span>
+          </p>
+        </section>
 
         <ErDiagramEditor
           v-if="editorType === 'er'"
@@ -258,6 +371,51 @@ onBeforeUnmount(() => {
     </main>
   </div>
 </template>
+
+<style scoped>
+.share-panel {
+  border: 1px solid var(--mac-border);
+  background: var(--mac-surface-strong);
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.share-row {
+  display: grid;
+  grid-template-columns: 90px 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.share-row label {
+  font-size: 12px;
+  color: var(--mac-subtext);
+}
+
+.share-row select,
+.share-row input {
+  border: 1px solid var(--mac-border);
+  border-radius: 8px;
+  padding: 7px 8px;
+  font-size: 12px;
+}
+
+.share-tip {
+  margin: 0;
+  font-size: 12px;
+  color: var(--mac-muted);
+}
+
+@media (max-width: 900px) {
+  .share-row {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
 
 <style scoped>
 .editor-root {

@@ -4,9 +4,10 @@ defineProps({
   subtitle: { type: String, default: '' },
   modeLabel: { type: String, default: '' },
   disableReload: { type: Boolean, default: false },
+  disableShare: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['back', 'reload'])
+const emit = defineEmits(['back', 'reload', 'share'])
 </script>
 
 <template>
@@ -33,6 +34,9 @@ const emit = defineEmits(['back', 'reload'])
     </div>
 
     <div class="shell-actions">
+      <button class="shell-action" :disabled="disableShare" @click="emit('share')">
+        分享
+      </button>
       <button class="shell-action" :disabled="disableReload" @click="emit('reload')">
         重新載入
       </button>
