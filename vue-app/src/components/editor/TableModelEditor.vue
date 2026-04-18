@@ -85,11 +85,51 @@ function normalizeContent(content) {
 
 const local = ref(normalizeContent(props.content))
 const canvasApi = ref(null)
+const canvasPanelRef = ref(null)
 
 const selectedTableId = ref('')
 const selectedColumnKey = ref('')
 const selectedFkId = ref('')
 const linkModeSource = ref(null)
+
+const floatingToolbar = ref({ x: 0, y: 72 })
+let floatingDragState = null
+
+function resetFloatingToolbar() {
+  const panel = canvasPanelRef.value
+  if (!panel) return
+  floatingToolbar.value.x = Math.max(12, panel.clientWidth - 196)
+  floatingToolbar.value.y = 74
+}
+
+function stopFloatingDrag() {
+  if (!floatingDragState) return
+  window.removeEventListener('mousemove', onFloatingDragMove)
+  window.removeEventListener('mouseup', stopFloatingDrag)
+  floatingDragState = null
+}
+
+function onFloatingDragMove(event) {
+  if (!floatingDragState) return
+  const panel = canvasPanelRef.value
+  if (!panel) return
+  const nextX = floatingDragState.startX + (event.clientX - floatingDragState.pointerX)
+  const nextY = floatingDragState.startY + (event.clientY - floatingDragState.pointerY)
+  floatingToolbar.value.x = Math.max(12, Math.min(nextX, panel.clientWidth - 176))
+  floatingToolbar.value.y = Math.max(12, Math.min(nextY, panel.clientHeight - 260))
+}
+
+function startFloatingDrag(event) {
+  event.preventDefault()
+  floatingDragState = {
+    pointerX: event.clientX,
+    pointerY: event.clientY,
+    startX: floatingToolbar.value.x,
+    startY: floatingToolbar.value.y,
+  }
+  window.addEventListener('mousemove', onFloatingDragMove)
+  window.addEventListener('mouseup', stopFloatingDrag)
+}
 
 const modeLabel = computed(() => {
   if (props.mode === 'table') return 'Physical Table'
@@ -296,8 +336,7 @@ function clamp(v, min, max) {
 }
 
 function buildColumnText(column) {
-  const marks = `${column.pk ? '🔑' : ''}${column.fk ? '📎' : ''}`
-  return `${marks}${marks ? ' ' : ''}${column.name}`
+  return column.name
 }
 
 function estimateCellWidth(column) {
@@ -389,6 +428,7 @@ function drawTable(Konva, objectGroup, table, cullingNodes) {
       text: buildColumnText(col),
       fontSize: 13.5,
       fill: '#0f172a',
+      textDecoration: col.pk ? 'underline' : '',
       listening: false,
     }))
 
@@ -564,10 +604,18 @@ function onKeyDown(event) {
 
 onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('resize', resetFloatingToolbar)
+  resetFloatingToolbar()
 })
 
 onBeforeUnmount(() => {
+  stopFloatingDrag()
   window.removeEventListener('keydown', onKeyDown)
+  window.removeEventListener('resize', resetFloatingToolbar)
+})
+
+watch([selectedTableId, selectedColumnKey], ([tId, cKey], [prevT, prevC]) => {
+  if ((tId && tId !== prevT) || (cKey && cKey !== prevC)) resetFloatingToolbar()
 })
 </script>
 
@@ -591,35 +639,39 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <main class="table-editor-main">
-      <section class="table-canvas-wrap">
-        <KonvaHugeCanvas
-          class="konva-root"
-          @ready="onKonvaReady"
-          @logical-click="onLogicalClick"
-        />
-      </section>
+    <main ref="canvasPanelRef" class="table-editor-main">
+      <KonvaHugeCanvas
+        class="konva-root"
+        @ready="onKonvaReady"
+        @logical-click="onLogicalClick"
+      />
 
-      <section class="fk-panel">
-        <h3>操作說明</h3>
-        <p class="muted">{{ modeHint }}</p>
-
-        <template v-if="selectedTable">
-          <h3>資料表</h3>
-          <input v-model="selectedTable.name" @input="onFieldInput" />
-          <button class="toolbar-btn danger" @click="removeTable(selectedTable.id)">刪除資料表</button>
-        </template>
-
-        <template v-if="selectedColumn">
-          <h3>欄位</h3>
-          <input v-model="selectedColumn.column.name" @input="onFieldInput" />
-          <input v-model="selectedColumn.column.dataType" @input="onFieldInput" />
-          <label class="flag"><input v-model="selectedColumn.column.pk" type="checkbox" @change="onFieldInput" /> PK</label>
-          <label class="flag"><input v-model="selectedColumn.column.fk" type="checkbox" @change="onFieldInput" /> FK</label>
-          <label class="flag"><input v-model="selectedColumn.column.nullable" type="checkbox" @change="onFieldInput" /> NULL</label>
-          <button class="toolbar-btn danger" @click="removeColumn(selectedColumn.table.id, selectedColumn.column.id)">刪除欄位</button>
-        </template>
-      </section>
+      <div
+        v-if="selectedTable || selectedColumn"
+        class="floating-toolbar"
+        :style="{ left: `${floatingToolbar.x}px`, top: `${floatingToolbar.y}px` }"
+      >
+        <div class="floating-toolbar-head" @mousedown="startFloatingDrag">工具列（可拖動）</div>
+        <div class="floating-toolbar-body">
+          <template v-if="selectedColumn">
+            <input class="floating-input" v-model="selectedColumn.column.name" @input="onFieldInput" placeholder="欄位名稱" />
+            <label class="floating-flag"><input type="checkbox" v-model="selectedColumn.column.pk" @change="onFieldInput" /> PK 主鍵</label>
+            <label class="floating-flag"><input type="checkbox" v-model="selectedColumn.column.fk" @change="onFieldInput" /> FK 外鍵</label>
+            <label v-if="mode === 'physical'" class="floating-flag"><input type="checkbox" v-model="selectedColumn.column.nullable" @change="onFieldInput" /> NULL</label>
+            <input v-if="mode === 'physical'" class="floating-input" v-model="selectedColumn.column.dataType" @input="onFieldInput" placeholder="資料類型" />
+            <button v-if="showFk" class="floating-btn" :class="{ active: linkModeSource }" @click="toggleLinkMode">
+              {{ linkModeSource ? '取消連線' : '→ 連線 FK' }}
+            </button>
+            <button class="floating-btn" @click="addColumn(selectedColumn.table.id)">＋ 新增欄位</button>
+            <button class="floating-btn danger" @click="removeColumn(selectedColumn.table.id, selectedColumn.column.id)">刪除欄位</button>
+          </template>
+          <template v-else-if="selectedTable">
+            <input class="floating-input" v-model="selectedTable.name" @input="onFieldInput" placeholder="資料表名稱" />
+            <button class="floating-btn" @click="addColumn(selectedTable.id)">＋ 新增欄位</button>
+            <button class="floating-btn danger" @click="removeTable(selectedTable.id)">刪除資料表</button>
+          </template>
+        </div>
+      </div>
     </main>
   </section>
 </template>
@@ -682,15 +734,9 @@ onBeforeUnmount(() => {
 }
 
 .table-editor-main {
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 12px;
   min-height: 0;
   flex: 1;
-}
-
-.table-canvas-wrap {
-  min-height: 0;
+  position: relative;
 }
 
 .konva-root {
@@ -698,14 +744,73 @@ onBeforeUnmount(() => {
   min-height: 560px;
 }
 
-.fk-panel {
+.floating-toolbar {
+  position: absolute;
+  z-index: 12;
+  width: 176px;
   border: 1px solid var(--mac-border);
-  border-radius: 14px;
-  background: var(--mac-surface-strong);
-  padding: 12px;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16);
+}
+
+.floating-toolbar-head {
+  cursor: move;
+  user-select: none;
+  border-bottom: 1px solid var(--mac-border);
+  background: #eef2f9;
+  color: #4a5a74;
+  border-radius: 10px 10px 0 0;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 8px;
+}
+
+.floating-toolbar-body {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  padding: 8px;
+}
+
+.floating-input {
+  width: 100%;
+  border: 1px solid var(--mac-border);
+  border-radius: 7px;
+  padding: 5px 8px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.floating-flag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.floating-btn {
+  width: 100%;
+  border: 1px solid var(--mac-border);
+  background: #fff;
+  border-radius: 7px;
+  min-height: 28px;
+  font-size: 12px;
+  text-align: left;
+  padding: 0 8px;
+  cursor: pointer;
+}
+
+.floating-btn.active {
+  border-color: rgba(255, 149, 0, 0.6);
+  background: rgba(255, 149, 0, 0.1);
+  color: #b45309;
+}
+
+.floating-btn.danger {
+  color: #c4453c;
+  border-color: rgba(255, 69, 58, 0.35);
 }
 
 .fk-panel h3 {
@@ -718,14 +823,6 @@ onBeforeUnmount(() => {
   border-radius: 8px;
   padding: 7px 8px;
   font-size: 13px;
-}
-
-.flag {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--mac-subtext);
 }
 
 .muted {

@@ -492,7 +492,6 @@ function buildNodeShape(Konva, node) {
       fill: '#ffffff',
       stroke: strokeColor,
       strokeWidth: isSelected ? 2 : 1,
-      cornerRadius: 12,
     }))
     if (node.type === 'weak-entity') {
       group.add(new Konva.Line({
@@ -648,42 +647,19 @@ watch(
 
 <template>
   <section class="er-editor">
-    <aside class="tool-panel">
-      <div class="tool-group">
-        <h3>元素選單</h3>
-        <div class="palette-list">
-          <button
-            v-for="item in ELEMENTS"
-            :key="item.type"
-            class="tool-btn palette-btn"
-            :class="{ active: paletteType === item.type }"
-            @click="queuePlacement(item.type)"
-          >
-            <span>{{ item.label }}</span>
-          </button>
-        </div>
-        <p class="muted">{{ modeHint }}</p>
-      </div>
-
-      <div class="tool-group" v-if="selectedNode">
-        <h3>元素屬性</h3>
-        <label>文字</label>
-        <input :value="selectedNode.label" @input="updateSelectedField('label', $event.target.value)" />
-        <label>寬度</label>
-        <input type="number" min="90" :value="selectedNode.w" @input="updateSelectedField('w', $event.target.value)" />
-        <label>高度</label>
-        <input type="number" min="56" :value="selectedNode.h" @input="updateSelectedField('h', $event.target.value)" />
-      </div>
-    </aside>
-
     <main ref="canvasPanelRef" class="canvas-panel">
       <header class="canvas-toolbar">
         <div class="toolbar-actions">
-          <button class="toolbar-btn" :disabled="!selectedNodeId" @click="startConnectMode">連線模式</button>
-          <button class="toolbar-btn" :disabled="!selectedNodeId" @click="startAppendMode">新增元素模式</button>
-          <button class="toolbar-btn" @click="cancelMode">取消模式</button>
-          <button class="toolbar-btn danger" :disabled="!selectedNodeId && !selectedEdgeId" @click="removeSelected">刪除選取</button>
+          <button
+            v-for="item in ELEMENTS"
+            :key="item.type"
+            class="toolbar-btn"
+            :class="{ active: queuedPlacementType === item.type }"
+            @click="queuePlacement(item.type)"
+          >＋ {{ item.label }}</button>
+          <button class="toolbar-btn" @click="cancelMode" v-if="toolMode !== 'select' || queuedPlacementType">Esc</button>
         </div>
+        <span class="mode-hint muted">{{ modeHint }}</span>
       </header>
       <KonvaHugeCanvas
         class="konva-root"
@@ -700,6 +676,12 @@ watch(
           工具列（可拖動）
         </div>
         <div class="floating-toolbar-body">
+          <input
+            class="floating-input"
+            placeholder="元素名稱"
+            :value="selectedNode.label"
+            @input="updateSelectedField('label', $event.target.value)"
+          />
           <select class="toolbar-select" @change="quickAddLinked($event.target.value); $event.target.value = ''">
             <option value="">＋ 新增元素</option>
             <option value="entity">實體</option>
@@ -709,7 +691,7 @@ watch(
           </select>
           <button class="floating-btn" @click="startConnectMode">→ 連線</button>
           <button class="floating-btn" @click="cloneSelectedNode">⎘ 複製</button>
-          <button class="floating-btn danger" @click="removeSelected">🗑 刪除</button>
+          <button class="floating-btn danger" @click="removeSelected">刪除</button>
           <select
             class="toolbar-select"
             :value="selectedNode.type"
@@ -728,69 +710,10 @@ watch(
 
 <style scoped>
 .er-editor {
-  display: grid;
-  grid-template-columns: 290px 1fr;
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   height: 100%;
-}
-
-.tool-panel {
-  border: 1px solid var(--mac-border);
-  border-radius: 14px;
-  background: var(--mac-surface-strong);
-  padding: 12px;
-  overflow: auto;
-}
-
-.tool-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.tool-group h3 {
-  font-size: 13px;
-  margin: 0;
-}
-
-.palette-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.palette-btn {
-  justify-content: flex-start;
-}
-
-.tool-group label {
-  font-size: 12px;
-  color: var(--mac-subtext);
-}
-
-.tool-group input {
-  border: 1px solid var(--mac-border);
-  background: #fff;
-  border-radius: 8px;
-  padding: 7px 8px;
-  font-size: 13px;
-}
-
-.tool-btn {
-  border: 1px solid var(--mac-border);
-  background: var(--mac-surface);
-  border-radius: 9px;
-  padding: 8px 9px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.tool-btn.active {
-  border-color: rgba(10, 132, 255, 0.68);
-  color: #0a5ed8;
-  background: rgba(10, 132, 255, 0.12);
 }
 
 .canvas-panel {
@@ -805,12 +728,16 @@ watch(
   border: 1px solid var(--mac-border);
   border-radius: 10px;
   background: var(--mac-surface-strong);
-  padding: 6px 8px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .toolbar-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .toolbar-btn {
@@ -894,9 +821,12 @@ watch(
   border-color: rgba(255, 69, 58, 0.35);
 }
 
-@media (max-width: 1080px) {
-  .er-editor {
-    grid-template-columns: 1fr;
-  }
+.floating-input {
+  width: 100%;
+  border: 1px solid var(--mac-border);
+  border-radius: 7px;
+  padding: 5px 8px;
+  font-size: 12px;
+  box-sizing: border-box;
 }
 </style>
