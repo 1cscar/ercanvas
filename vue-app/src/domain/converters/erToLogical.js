@@ -10,6 +10,12 @@ function sortPkFirst(columns) {
   return [...columns].sort((a, b) => Number(Boolean(b.pk)) - Number(Boolean(a.pk)))
 }
 
+const TABLE_START_X = 80
+const TABLE_START_Y = 80
+const TABLE_GAP_X = 380
+const TABLE_GAP_Y = 220
+const TABLES_PER_ROW = 3
+
 export function convertErToLogical({ nodes = [], edges = [], nextId = 1, existingTables = [] } = {}) {
   let localNextId = nextId
   const attrTypes = new Set(['attribute', 'multi-value', 'derived'])
@@ -18,7 +24,7 @@ export function convertErToLogical({ nodes = [], edges = [], nextId = 1, existin
   const mkCol = (attribute, fk = false) => ({
     id: `lc${localNextId++}`,
     name: attribute.label || '欄位',
-    pk: attribute.style?.underline === true,
+    pk: attribute.fontUnderline === true || attribute.style?.underline === true,
     fk,
   })
 
@@ -36,11 +42,15 @@ export function convertErToLogical({ nodes = [], edges = [], nextId = 1, existin
 
       if (!columns.length) columns.push({ id: `lc${localNextId++}`, name: 'id', pk: true, fk: false })
 
+      const layoutIndex = tables.length
+      const columnIndex = layoutIndex % TABLES_PER_ROW
+      const rowIndex = Math.floor(layoutIndex / TABLES_PER_ROW)
+
       tables.push({
         id: `lt${localNextId++}`,
         name: entity.label || '表格',
-        x: 0,
-        y: 0,
+        x: TABLE_START_X + (columnIndex * TABLE_GAP_X),
+        y: TABLE_START_Y + (rowIndex * TABLE_GAP_Y),
         columns,
       })
     })

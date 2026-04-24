@@ -119,7 +119,6 @@ function positionToolbarNearNode(node) {
 
 const selectedNode = computed(() => local.value.nodes.find((n) => n.id === selectedNodeId.value) || null)
 const editingNode = computed(() => local.value.nodes.find((n) => n.id === editingNodeId.value) || null)
-const textToolbarDisabled = computed(() => !selectedNode.value)
 
 const inlineEditorStyle = computed(() => {
   const node = editingNode.value
@@ -787,28 +786,6 @@ watch(
     <main ref="canvasPanelRef" class="canvas-panel">
       <header ref="canvasToolbarRef" class="canvas-toolbar">
         <span class="mode-hint muted">{{ modeHint }}</span>
-        <div class="text-toolbar" :class="{ disabled: textToolbarDisabled }">
-          <span class="text-toolbar-label">文字</span>
-          <button class="text-toolbar-btn" :disabled="textToolbarDisabled" @click="setSelectedFontSize((selectedNode?.fontSize || 14) - 2)">A-</button>
-          <input
-            class="text-toolbar-input"
-            type="number"
-            min="10"
-            max="72"
-            :disabled="textToolbarDisabled"
-            :value="selectedNode?.fontSize || 14"
-            @change="setSelectedFontSize($event.target.value)"
-          />
-          <button class="text-toolbar-btn" :disabled="textToolbarDisabled" @click="setSelectedFontSize((selectedNode?.fontSize || 14) + 2)">A+</button>
-          <button
-            class="text-toolbar-btn"
-            :class="{ active: selectedNode?.fontUnderline }"
-            :disabled="textToolbarDisabled"
-            @click="toggleSelectedUnderline"
-          >
-            底線
-          </button>
-        </div>
       </header>
       <div ref="canvasStageRef" class="canvas-stage">
         <KonvaHugeCanvas
@@ -968,56 +945,6 @@ watch(
 .konva-root {
   flex: 1;
   min-height: 520px;
-}
-
-.text-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  flex-shrink: 0;
-}
-
-.text-toolbar.disabled {
-  opacity: 0.5;
-}
-
-.text-toolbar-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  color: #7b8798;
-}
-
-.text-toolbar-btn,
-.text-toolbar-input {
-  border: 1px solid var(--mac-border);
-  border-radius: 7px;
-  background: #fff;
-  min-height: 28px;
-  font-size: 12px;
-}
-
-.text-toolbar-btn {
-  padding: 0 9px;
-  cursor: pointer;
-}
-
-.text-toolbar-btn.active {
-  border-color: rgba(10, 132, 255, 0.55);
-  background: rgba(10, 132, 255, 0.12);
-  color: #0a5ed8;
-}
-
-.text-toolbar-btn:disabled,
-.text-toolbar-input:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.text-toolbar-input {
-  width: 60px;
-  padding: 0 8px;
 }
 
 .muted {
