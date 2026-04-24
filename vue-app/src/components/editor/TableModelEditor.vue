@@ -13,15 +13,17 @@ const props = defineProps({
 
 const emit = defineEmits(['update:content'])
 
-const TABLE_HEADER_HEIGHT = 50
 const TABLE_ROW_HEIGHT = 40
 const TABLE_ROW_HEIGHT_PHYSICAL = 52
 const TABLE_CELL_MIN_WIDTH = 92
 const TABLE_CELL_MAX_WIDTH = 220
-const LINK_PORT_OUTSET = 10
+const TABLE_TITLE_HEIGHT = 42
+const TABLE_TITLE_GAP = 8
+const LINK_PORT_OUTSET = 0
 const LINK_CLEARANCE = 24
 const LINK_OBSTACLE_PADDING = 14
 const LINK_INTERSECTION_PENALTY = 100000
+const LINK_CURVE_TENSION = 0.48
 
 function deepClone(value) {
   return JSON.parse(JSON.stringify(value))
@@ -367,13 +369,15 @@ function getTableMetrics(table) {
   const cellWidths = table.columns.map((column) => estimateCellWidth(column))
   const titleWidth = table.name.length * 18 + 48
   const rowWidth = Math.max(cellWidths.reduce((sum, width) => sum + width, 0), titleWidth, TABLE_CELL_MIN_WIDTH)
+  const rowHeight = props.mode === 'physical' ? TABLE_ROW_HEIGHT_PHYSICAL : TABLE_ROW_HEIGHT
+  const rowY = TABLE_TITLE_HEIGHT + TABLE_TITLE_GAP
   return {
     cellWidths,
     rowWidth,
-    headerHeight: TABLE_HEADER_HEIGHT,
-    rowY: TABLE_HEADER_HEIGHT,
-    rowHeight: props.mode === 'physical' ? TABLE_ROW_HEIGHT_PHYSICAL : TABLE_ROW_HEIGHT,
-    totalHeight: TABLE_HEADER_HEIGHT + (props.mode === 'physical' ? TABLE_ROW_HEIGHT_PHYSICAL : TABLE_ROW_HEIGHT),
+    titleHeight: TABLE_TITLE_HEIGHT,
+    rowY,
+    rowHeight,
+    totalHeight: rowY + rowHeight,
   }
 }
 
@@ -512,6 +516,21 @@ function routePolyline(start, end, obstacles) {
   return best
 }
 
+function ensureCurveWaypoint(points) {
+  if (points.length > 2) return points
+  const [start, end] = points
+  if (!start || !end) return points
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+  if (Math.abs(dx) + Math.abs(dy) < 1) return points
+  const curveMagnitude = clamp(Math.max(Math.abs(dx), Math.abs(dy)) * 0.22, 28, 96)
+  const mid = {
+    x: (start.x + end.x) / 2 + (dy >= 0 ? -curveMagnitude : curveMagnitude),
+    y: (start.y + end.y) / 2 + (dx >= 0 ? curveMagnitude : -curveMagnitude),
+  }
+  return [start, mid, end]
+}
+
 function drawTable(Konva, objectGroup, table, cullingNodes) {
   const metrics = getTableMetrics(table)
   const isSelected = selectedTableId.value === table.id
@@ -523,39 +542,25 @@ function drawTable(Konva, objectGroup, table, cullingNodes) {
 
   group.add(new Konva.Rect({
     x: 0,
-    y: 0,
+    y: metrics.rowY,
     width: metrics.rowWidth,
-    height: metrics.totalHeight,
+    height: metrics.rowHeight,
     fill: '#ffffff',
     stroke: isSelected ? '#0a84ff' : '#46505e',
     strokeWidth: isSelected ? 2.2 : 2,
   }))
 
-  group.add(new Konva.Rect({
-    x: 0,
-    y: 0,
-    width: metrics.rowWidth,
-    height: metrics.headerHeight,
-    fill: '#f4f6f8',
-    strokeWidth: 0,
-  }))
-
   group.add(new Konva.Text({
-    x: 14,
-    y: 12,
-    width: metrics.rowWidth - 28,
+    x: 0,
+    y: 6,
+    width: metrics.rowWidth,
     text: table.name,
     fontSize: 20,
     fontStyle: '900',
     fill: '#111827',
+    align: 'center',
+    verticalAlign: 'middle',
     ellipsis: true,
-    listening: false,
-  }))
-
-  group.add(new Konva.Line({
-    points: [0, metrics.headerHeight, metrics.rowWidth, metrics.headerHeight],
-    stroke: '#46505e',
-    strokeWidth: 2,
     listening: false,
   }))
 
@@ -631,14 +636,14 @@ function drawTable(Konva, objectGroup, table, cullingNodes) {
     evt.cancelBubble = true
     const p = group.getRelativePointerPosition()
     if (!p) return
-    if (p.y < metrics.headerHeight) {
+    if (p.y < metrics.rowY) {
       selectedTableId.value = table.id
       selectedColumnKey.value = ''
       selectedFkId.value = ''
       renderScene()
       return
     }
-    if (p.y > metrics.totalHeight) return
+    if (p.y > metrics.rowY + metrics.rowHeight) return
 
     let cursor = 0
     let col = null
@@ -716,7 +721,8 @@ function renderScene() {
       const obstacles = local.value.tables
         .filter((table) => table.id !== fromTable.id && table.id !== toTable.id)
         .map((table) => getTableRect(table, LINK_OBSTACLE_PADDING))
-      const path = routePolyline(fromAnchor, toAnchor, obstacles)
+      const rawPath = routePolyline(fromAnchor, toAnchor, obstacles)
+      const path = ensureCurveWaypoint(rawPath)
       const points = path.flatMap((point) => [point.x, point.y])
       routedFkLines.push({ fk, points })
 
@@ -756,6 +762,9 @@ function renderScene() {
       strokeWidth: selectedFkId.value === fk.id ? 2.8 : 2.2,
       pointerLength: 10,
       pointerWidth: 10,
+      tension: LINK_CURVE_TENSION,
+      lineCap: 'round',
+      lineJoin: 'round',
       listening: false,
     })
     objectGroup.add(line)
