@@ -64,14 +64,14 @@ export function FieldToolbar({ table, field, mode = 'logical', onStartConnect }:
           className="rounded border border-slate-300 px-2 py-1 hover:bg-slate-100"
           onClick={() => addLogicalField(table.id, fieldIndex - 1)}
         >
-          ← 向左新增
+          ↑ 上方新增
         </button>
         <button
           type="button"
           className="rounded border border-slate-300 px-2 py-1 hover:bg-slate-100"
           onClick={() => addLogicalField(table.id, fieldIndex)}
         >
-          → 向右新增
+          ↓ 下方新增
         </button>
       </div>
 

@@ -7,6 +7,7 @@ interface EditableLabelProps {
   nodeId: string
   data: ERNodeData
   forceUnderline?: boolean
+  editNonce?: number
 }
 
 export function ERNodeResizer({ selected }: { selected?: boolean }) {
@@ -40,7 +41,7 @@ export function ERNodeHandles() {
   )
 }
 
-export function EditableERLabel({ nodeId, data, forceUnderline = false }: EditableLabelProps) {
+export function EditableERLabel({ nodeId, data, forceUnderline = false, editNonce = 0 }: EditableLabelProps) {
   const updateERNodeData = useDiagramStore((state) => state.updateERNodeData)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(data.label ?? '')
@@ -60,6 +61,11 @@ export function EditableERLabel({ nodeId, data, forceUnderline = false }: Editab
     selection.removeAllRanges()
     selection.addRange(range)
   }, [editing])
+
+  useEffect(() => {
+    if (editNonce <= 0) return
+    setEditing(true)
+  }, [editNonce])
 
   const labelStyle = useMemo(
     () => ({

@@ -21,6 +21,7 @@ import EREntityNode from '../components/nodes/EREntityNode'
 import RelationshipNode from '../components/nodes/RelationshipNode'
 import { ShareDiagramButton } from '../components/toolbars/ShareDiagramButton'
 import { ERFloatingToolbar } from '../components/toolbars/ERFloatingToolbar'
+import { ERTopToolbar } from '../components/toolbars/ERTopToolbar'
 import { convertERtoLogical } from '../lib/erToLogical'
 import { supabase } from '../lib/supabase'
 import { useDiagramStore } from '../store/diagramStore'
@@ -58,6 +59,7 @@ function ERDiagramInner() {
   const setERNodes = useDiagramStore((state) => state.setERNodes)
   const setEREdges = useDiagramStore((state) => state.setEREdges)
   const addERNode = useDiagramStore((state) => state.addERNode)
+  const updateERNodeData = useDiagramStore((state) => state.updateERNodeData)
   const setPendingNodeType = useDiagramStore((state) => state.setPendingNodeType)
   const loadER = useDiagramStore((state) => state.loadER)
   const saveER = useDiagramStore((state) => state.saveER)
@@ -352,6 +354,18 @@ function ERDiagramInner() {
     )
   }
 
+  const setSelectedFontSize = (fontSize: number) => {
+    if (!selectedNode) return
+    updateERNodeData(selectedNode.id, { fontSize })
+  }
+
+  const toggleSelectedUnderline = () => {
+    if (!selectedNode) return
+    updateERNodeData(selectedNode.id, {
+      fontUnderline: !selectedNode.data.fontUnderline
+    })
+  }
+
   return (
     <div className="flex h-screen w-full flex-col bg-[#f2f4f7]">
       <header className="flex h-[54px] items-center justify-between border-b border-slate-200 bg-white px-4">
@@ -376,6 +390,13 @@ function ERDiagramInner() {
           </button>
         </div>
       </header>
+
+      <ERTopToolbar
+        selectedNode={selectedNode ?? null}
+        disabled={isReadOnly}
+        onSetFontSize={setSelectedFontSize}
+        onToggleUnderline={toggleSelectedUnderline}
+      />
 
       <div
         className={`flex min-h-0 flex-1 bg-slate-100 ${pendingNodeType && !isReadOnly ? 'cursor-crosshair' : ''}`}

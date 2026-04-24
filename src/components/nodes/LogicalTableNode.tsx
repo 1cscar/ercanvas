@@ -2,7 +2,7 @@ import { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Handle, Node, NodeProps, NodeResizer, Position } from '@xyflow/react'
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { horizontalListSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable'
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { LogicalField, LogicalTable } from '../../types'
 
 export interface LogicalTableNodeData extends Record<string, unknown> {
@@ -87,17 +87,15 @@ function FieldCell({
   return (
     <div
       ref={setNodeRef}
-      className={`nodrag group relative flex min-w-[92px] items-center justify-center px-4 text-[13px] font-semibold text-slate-900 ${
-        mode === 'physical' ? 'h-11' : 'h-9'
-      } ${selected ? 'bg-[#ecf2ff]' : 'bg-white'} ${isLast ? '' : 'border-r border-[#4d5562]'}`}
+      className={`nodrag group relative flex min-h-[44px] w-full items-center gap-2 px-3 text-[13px] font-semibold text-slate-900 ${
+        selected ? 'bg-[#ecf2ff]' : 'bg-white'
+      } ${isLast ? '' : 'border-b border-[#4d5562]'}`}
       style={{
         transform: CSS.Transform.toString(transform),
         transition
       }}
       onClick={() => onSelectField(tableId, field.id)}
       onDoubleClick={() => setEditing(true)}
-      {...attributes}
-      {...listeners}
     >
       <Handle
         type="target"
@@ -115,7 +113,7 @@ function FieldCell({
       {editing ? (
         <div
           ref={editableRef}
-          className="nodrag min-w-0 whitespace-nowrap outline-none"
+          className="nodrag min-w-0 flex-1 break-words outline-none"
           contentEditable
           suppressContentEditableWarning
           onInput={(event) => setDraft(event.currentTarget.textContent ?? '')}
@@ -125,13 +123,25 @@ function FieldCell({
           {draft}
         </div>
       ) : (
-        <div className="min-w-0 whitespace-nowrap text-center">
-          <span>{field.name}</span>
+        <div className="min-w-0 flex-1 py-2">
+          <div className="break-words text-left leading-5">{field.name}</div>
           {mode === 'physical' && (
-            <div className="mt-0.5 text-[10px] font-normal text-slate-500">{renderPhysicalMeta(field)}</div>
+            <div className="mt-0.5 break-words text-[10px] font-normal leading-4 text-slate-500">
+              {renderPhysicalMeta(field)}
+            </div>
           )}
         </div>
       )}
+
+      <button
+        type="button"
+        className="nodrag flex h-7 w-7 shrink-0 cursor-grab items-center justify-center rounded border border-slate-200 text-slate-400 hover:border-slate-300 hover:text-slate-600"
+        aria-label={`拖曳排序 ${field.name}`}
+        {...attributes}
+        {...listeners}
+      >
+        ⋮⋮
+      </button>
     </div>
   )
 }
@@ -154,10 +164,16 @@ export default function LogicalTableNode({ data, selected }: NodeProps<LogicalTa
   useEffect(() => {
     if (!editingTitle || !titleRef.current) return
     titleRef.current.focus()
+    const selection = window.getSelection()
+    if (!selection) return
+    const range = document.createRange()
+    range.selectNodeContents(titleRef.current)
+    selection.removeAllRanges()
+    selection.addRange(range)
   }, [editingTitle])
 
   const sortedFields = useMemo(
-    () => [...table.fields].sort((a, b) => Number(b.is_pk) - Number(a.is_pk) || a.order_index - b.order_index),
+    () => [...table.fields].sort((a, b) => a.order_index - b.order_index),
     [table.fields]
   )
 
@@ -171,61 +187,72 @@ export default function LogicalTableNode({ data, selected }: NodeProps<LogicalTa
   }
 
   return (
-    <div className="relative inline-block">
+    <div className="relative min-w-[240px] w-full">
       <NodeResizer
         isVisible={Boolean(selected)}
         minWidth={240}
-        minHeight={52}
+        minHeight={120}
         lineClassName="border-blue-400"
         handleClassName="h-2.5 w-2.5 rounded-sm border border-blue-600 bg-white"
       />
 
-      <div
-        className="mb-1 pl-1 text-[34px] font-black leading-none tracking-tight text-slate-900"
-        onDoubleClick={() => setEditingTitle(true)}
-      >
-        {editingTitle ? (
-          <div
-            ref={titleRef}
-            className="nodrag rounded bg-white/80 px-1 outline-none"
-            contentEditable
-            suppressContentEditableWarning
-            onInput={(event) => setTitleDraft(event.currentTarget.textContent ?? '')}
-            onBlur={() => {
-              setEditingTitle(false)
-              data.onUpdateTableName(table.id, titleDraft.trim() || 'unnamed_table')
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault()
-                setEditingTitle(false)
-                data.onUpdateTableName(table.id, titleDraft.trim() || 'unnamed_table')
-              }
-            }}
-          >
-            {titleDraft}
-          </div>
-        ) : (
-          table.name
-        )}
-      </div>
-
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <SortableContext items={sortedFields.map((field) => field.id)} strategy={horizontalListSortingStrategy}>
-          <div className="inline-flex flex-nowrap items-stretch overflow-visible border-2 border-[#4d5562] bg-white">
-            {sortedFields.map((field, index) => (
-              <FieldCell
-                key={field.id}
-                index={index}
-                tableId={table.id}
-                field={field}
-                selected={data.selectedFieldId === field.id}
-                mode={mode}
-                isLast={index === sortedFields.length - 1}
-                onSelectField={data.onSelectField}
-                onUpdateFieldName={data.onUpdateFieldName}
-              />
-            ))}
+        <SortableContext items={sortedFields.map((field) => field.id)} strategy={verticalListSortingStrategy}>
+          <div className="overflow-hidden rounded-sm border-2 border-[#4d5562] bg-white shadow-sm">
+            <div
+              className="flex cursor-grab items-center justify-between gap-3 border-b-2 border-[#4d5562] bg-[#f4f6f8] px-3 py-2"
+              onDoubleClick={() => setEditingTitle(true)}
+            >
+              {editingTitle ? (
+                <div
+                  ref={titleRef}
+                  className="nodrag min-w-0 flex-1 rounded bg-white px-2 py-1 text-lg font-black tracking-tight text-slate-900 outline-none"
+                  contentEditable
+                  suppressContentEditableWarning
+                  onInput={(event) => setTitleDraft(event.currentTarget.textContent ?? '')}
+                  onBlur={() => {
+                    setEditingTitle(false)
+                    data.onUpdateTableName(table.id, titleDraft.trim() || 'unnamed_table')
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      setEditingTitle(false)
+                      data.onUpdateTableName(table.id, titleDraft.trim() || 'unnamed_table')
+                    }
+                    if (event.key === 'Escape') {
+                      event.preventDefault()
+                      setEditingTitle(false)
+                      setTitleDraft(table.name)
+                    }
+                  }}
+                >
+                  {titleDraft}
+                </div>
+              ) : (
+                <div className="min-w-0 flex-1 break-words text-lg font-black tracking-tight text-slate-900">
+                  {table.name}
+                </div>
+              )}
+
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Drag</div>
+            </div>
+
+            <div className="flex flex-col">
+              {sortedFields.map((field, index) => (
+                <FieldCell
+                  key={field.id}
+                  index={index}
+                  tableId={table.id}
+                  field={field}
+                  selected={data.selectedFieldId === field.id}
+                  mode={mode}
+                  isLast={index === sortedFields.length - 1}
+                  onSelectField={data.onSelectField}
+                  onUpdateFieldName={data.onUpdateFieldName}
+                />
+              ))}
+            </div>
           </div>
         </SortableContext>
       </DndContext>

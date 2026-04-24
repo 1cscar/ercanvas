@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Node, NodeProps } from '@xyflow/react'
 import { ERNodeData } from '../../types'
 import { EditableERLabel, ERNodeHandles, ERNodeResizer } from './ERNodeCommon'
@@ -5,8 +6,13 @@ import { EditableERLabel, ERNodeHandles, ERNodeResizer } from './ERNodeCommon'
 type EREntityRelationFlowNode = Node<ERNodeData>
 
 export default function EREntityNode({ id, data, selected }: NodeProps<EREntityRelationFlowNode>) {
+  const [editNonce, setEditNonce] = useState(0)
+
   return (
-    <div className="relative h-full w-full border-2 border-black bg-white text-slate-900">
+    <div
+      className="relative h-full w-full border-2 border-black bg-white text-slate-900"
+      onDoubleClick={() => setEditNonce((value) => value + 1)}
+    >
       <ERNodeResizer selected={selected} />
       <ERNodeHandles />
       <svg
@@ -16,7 +22,7 @@ export default function EREntityNode({ id, data, selected }: NodeProps<EREntityR
         <polygon points="50,2 98,50 50,98 2,50" fill="none" stroke="black" strokeWidth="4" />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <EditableERLabel nodeId={id} data={data} />
+        <EditableERLabel nodeId={id} data={data} editNonce={editNonce} />
       </div>
     </div>
   )
