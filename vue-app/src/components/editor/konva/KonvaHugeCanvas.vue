@@ -14,6 +14,8 @@ const LOGICAL_WIDTH = 55000
 const LOGICAL_HEIGHT = 35000
 const MIN_SCALE = 0.05
 const MAX_SCALE = 5
+const ZOOM_BUTTON_FACTOR = 1.12
+const OVERVIEW_PADDING_PX = 72
 
 const emit = defineEmits([
   'ready',
@@ -151,6 +153,17 @@ function setViewport(next = {}, options = {}) {
   requestLayerDraw()
 }
 
+function applyScaleAroundScreenPoint(nextScale, screenX, screenY, options = {}) {
+  if (!worldLayer) return
+  const targetScale = clamp(Number(nextScale) || 1, MIN_SCALE, MAX_SCALE)
+  const logicalPoint = getLogicalPosition(screenX, screenY)
+  setViewport({
+    scale: targetScale,
+    x: screenX - logicalPoint.x * targetScale,
+    y: screenY - logicalPoint.y * targetScale,
+  }, options)
+}
+
 function fitStageToWindow() {
   if (!stage) return
   stage.size({
@@ -169,23 +182,10 @@ function onWheelZoomAtPointer(e) {
   if (!pointer) return
 
   const oldScale = worldLayer.scaleX()
-  const logicalPoint = getLogicalPosition(pointer.x, pointer.y)
-
   const direction = e.evt.deltaY > 0 ? -1 : 1
   const scaleBy = direction > 0 ? 1.08 : (1 / 1.08)
   const nextScale = clamp(oldScale * scaleBy, MIN_SCALE, MAX_SCALE)
-
-  worldLayer.scale({ x: nextScale, y: nextScale })
-
-  // 保持滑鼠下的邏輯點在縮放後仍對齊到同一個螢幕位置
-  worldLayer.position({
-    x: pointer.x - logicalPoint.x * nextScale,
-    y: pointer.y - logicalPoint.y * nextScale,
-  })
-
-  throttledCull()
-  updateViewportMeta()
-  requestLayerDraw()
+  applyScaleAroundScreenPoint(nextScale, pointer.x, pointer.y)
 }
 
 function onPointerDown(e) {
@@ -270,6 +270,81 @@ function clearObjects() {
   }
   elements.value = []
   requestLayerDraw()
+}
+
+function getContentLogicalBounds() {
+  if (!worldLayer) return null
+  const scale = worldLayer.scaleX() || 1
+  const pos = worldLayer.position()
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+
+  for (let i = 0; i < elements.value.length; i += 1) {
+    const node = elements.value[i]?.node
+    if (!node) continue
+    const rect = node.getClientRect({ skipShadow: true, skipStroke: false })
+    if (!Number.isFinite(rect.x) || !Number.isFinite(rect.y) || rect.width <= 0 || rect.height <= 0) continue
+    const left = (rect.x - pos.x) / scale
+    const top = (rect.y - pos.y) / scale
+    const right = left + (rect.width / scale)
+    const bottom = top + (rect.height / scale)
+    minX = Math.min(minX, left)
+    minY = Math.min(minY, top)
+    maxX = Math.max(maxX, right)
+    maxY = Math.max(maxY, bottom)
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) return null
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(1, maxX - minX),
+    height: Math.max(1, maxY - minY),
+  }
+}
+
+function zoomIn() {
+  if (!stage || !worldLayer) return
+  const nextScale = clamp((worldLayer.scaleX() || 1) * ZOOM_BUTTON_FACTOR, MIN_SCALE, MAX_SCALE)
+  applyScaleAroundScreenPoint(nextScale, stage.width() / 2, stage.height() / 2)
+}
+
+function zoomOut() {
+  if (!stage || !worldLayer) return
+  const nextScale = clamp((worldLayer.scaleX() || 1) / ZOOM_BUTTON_FACTOR, MIN_SCALE, MAX_SCALE)
+  applyScaleAroundScreenPoint(nextScale, stage.width() / 2, stage.height() / 2)
+}
+
+function fitToOverview() {
+  if (!stage || !worldLayer) return
+  const bounds = getContentLogicalBounds()
+  if (!bounds) {
+    setViewport({
+      scale: 1,
+      x: (stage.width() / 2) - (LOGICAL_WIDTH / 2),
+      y: (stage.height() / 2) - (LOGICAL_HEIGHT / 2),
+    }, { throttle: false })
+    return
+  }
+
+  const fitScale = clamp(
+    Math.min(
+      (stage.width() - OVERVIEW_PADDING_PX * 2) / bounds.width,
+      (stage.height() - OVERVIEW_PADDING_PX * 2) / bounds.height,
+    ),
+    MIN_SCALE,
+    MAX_SCALE,
+  )
+
+  const centerX = bounds.x + bounds.width / 2
+  const centerY = bounds.y + bounds.height / 2
+  setViewport({
+    scale: fitScale,
+    x: (stage.width() / 2) - centerX * fitScale,
+    y: (stage.height() / 2) - centerY * fitScale,
+  }, { throttle: false })
 }
 
 function destroyStage() {
@@ -376,6 +451,9 @@ defineExpose({
   getLogicalPosition,
   setViewport,
   getLogicalBounds: () => ({ width: LOGICAL_WIDTH, height: LOGICAL_HEIGHT }),
+  fitToOverview,
+  zoomIn,
+  zoomOut,
   getKonva: () => Konva,
   getStage: () => stage,
   getLayers: () => ({ worldLayer, objectGroup }),
@@ -396,11 +474,19 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="container" class="konva-huge-canvas"></div>
+  <div class="konva-huge-canvas">
+    <div ref="container" class="konva-stage-host"></div>
+    <div class="canvas-controls">
+      <button class="canvas-control-btn" @mousedown.stop @click.stop="zoomIn">+</button>
+      <button class="canvas-control-btn" @mousedown.stop @click.stop="zoomOut">-</button>
+      <button class="canvas-control-btn overview" @mousedown.stop @click.stop="fitToOverview">全覽</button>
+    </div>
+  </div>
 </template>
 
 <style scoped>
 .konva-huge-canvas {
+  position: relative;
   width: 100%;
   height: 100%;
   min-height: 520px;
@@ -408,5 +494,46 @@ onBeforeUnmount(() => {
   border-radius: 14px;
   overflow: hidden;
   background: #eef3fc;
+}
+
+.konva-stage-host {
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+}
+
+.canvas-controls {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 15;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.canvas-control-btn {
+  height: 28px;
+  min-width: 28px;
+  border: 1px solid var(--mac-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #344054;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 8px;
+}
+
+.canvas-control-btn.overview {
+  min-width: 46px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.canvas-control-btn:hover {
+  background: #ffffff;
+  border-color: #c2ccdc;
 }
 </style>
