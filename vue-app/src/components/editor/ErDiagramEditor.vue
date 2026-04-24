@@ -106,13 +106,15 @@ function positionToolbarNearNode(node) {
   const panel = canvasPanelRef.value
   if (!panel || !node) return
   const { scale, x: vx, y: vy } = viewport.value
-  const toolbarH = (canvasToolbarRef.value?.offsetHeight || 46) + 8
-  const nodeRight = node.x * scale + vx + node.w * scale + 12
-  const nodeTop = node.y * scale + vy + toolbarH
+  const topBarHeight = (canvasToolbarRef.value?.offsetHeight || 46) + 8
+  const toolbarWidth = 176
+  const toolbarHeight = 248
+  const nodeRight = node.x * scale + vx + node.w * scale + 8
+  const nodeTop = node.y * scale + vy + Math.max(0, (node.h * scale - toolbarHeight) / 2)
   const panelW = panel.clientWidth
   const panelH = panel.clientHeight
-  floatingToolbar.value.x = Math.max(8, Math.min(nodeRight, panelW - 184))
-  floatingToolbar.value.y = Math.max(toolbarH, Math.min(nodeTop, panelH - 240))
+  floatingToolbar.value.x = Math.max(8, Math.min(nodeRight, panelW - toolbarWidth - 8))
+  floatingToolbar.value.y = Math.max(topBarHeight, Math.min(nodeTop, panelH - toolbarHeight - 8))
 }
 
 const selectedNode = computed(() => local.value.nodes.find((n) => n.id === selectedNodeId.value) || null)
@@ -853,9 +855,22 @@ watch(
               <option value="relationship">關係</option>
               <option value="weak-entity">實體關聯</option>
             </select>
-            <button class="floating-btn" @click="startConnectMode">→ 連線</button>
-            <button class="floating-btn" @click="cloneSelectedNode">⎘ 複製</button>
-            <button class="floating-btn danger" @click="removeSelected">刪除</button>
+          <button class="floating-btn" @click="startConnectMode">→ 連線</button>
+          <div class="floating-inline-tools">
+            <button class="floating-mini-btn" @click="setSelectedFontSize((selectedNode?.fontSize || 14) - 2)">A-</button>
+            <input
+              class="floating-mini-input"
+              type="number"
+              min="10"
+              max="72"
+              :value="selectedNode?.fontSize || 14"
+              @change="setSelectedFontSize($event.target.value)"
+            />
+            <button class="floating-mini-btn" @click="setSelectedFontSize((selectedNode?.fontSize || 14) + 2)">A+</button>
+            <button class="floating-mini-btn" :class="{ active: selectedNode?.fontUnderline }" @click="toggleSelectedUnderline">底線</button>
+          </div>
+          <button class="floating-btn" @click="cloneSelectedNode">⎘ 複製</button>
+          <button class="floating-btn danger" @click="removeSelected">刪除</button>
             <select
               class="toolbar-select"
               :value="selectedNode.type"
@@ -1050,6 +1065,41 @@ watch(
   font-size: 12px;
   text-align: left;
   padding: 0 8px;
+}
+
+.floating-inline-tools {
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
+  gap: 6px;
+}
+
+.floating-mini-btn,
+.floating-mini-input {
+  border: 1px solid var(--mac-border);
+  background: #fff;
+  border-radius: 7px;
+  min-height: 28px;
+  font-size: 12px;
+}
+
+.floating-mini-btn {
+  cursor: pointer;
+}
+
+.floating-mini-btn.active {
+  border-color: rgba(10, 132, 255, 0.55);
+  background: rgba(10, 132, 255, 0.12);
+  color: #0a5ed8;
+}
+
+.floating-mini-input {
+  width: 100%;
+  text-align: center;
+  padding: 0 4px;
+}
+
+.floating-inline-tools .floating-mini-btn:last-child {
+  grid-column: 1 / -1;
 }
 
 .floating-btn {

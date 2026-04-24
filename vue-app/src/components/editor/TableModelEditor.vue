@@ -86,6 +86,7 @@ function normalizeContent(content) {
 const local = ref(normalizeContent(props.content))
 const canvasApi = ref(null)
 const canvasPanelRef = ref(null)
+const viewport = ref({ scale: 1, x: 24, y: 24 })
 
 const selectedTableId = ref('')
 const selectedColumnKey = ref('')
@@ -95,11 +96,34 @@ const linkModeSource = ref(null)
 const floatingToolbar = ref({ x: Math.max(12, window.innerWidth - 200), y: 72 })
 let floatingDragState = null
 
-function resetFloatingToolbar() {
+function onViewportChange(vp) {
+  viewport.value = { scale: vp.scale, x: vp.position.x, y: vp.position.y }
+  positionToolbarNearSelection()
+}
+
+function positionToolbarNearSelection() {
   const panel = canvasPanelRef.value
-  const w = panel?.clientWidth || window.innerWidth
-  floatingToolbar.value.x = Math.max(12, w - 196)
-  floatingToolbar.value.y = 74
+  if (!panel) return
+
+  const selectedTableValue = selectedColumn.value?.table || selectedTable.value
+  if (!selectedTableValue) {
+    const w = panel.clientWidth || window.innerWidth
+    floatingToolbar.value.x = Math.max(12, w - 196)
+    floatingToolbar.value.y = 74
+    return
+  }
+
+  const metrics = getTableMetrics(selectedTableValue)
+  const { scale, x: vx, y: vy } = viewport.value
+  const toolbarWidth = 176
+  const toolbarHeight = selectedColumn.value ? 258 : 146
+  const anchorX = selectedTableValue.x * scale + vx + metrics.rowWidth * scale + 10
+  const anchorY = selectedColumn.value
+    ? selectedTableValue.y * scale + vy + metrics.rowY * scale - 6
+    : selectedTableValue.y * scale + vy + 6
+
+  floatingToolbar.value.x = Math.max(12, Math.min(anchorX, panel.clientWidth - toolbarWidth - 8))
+  floatingToolbar.value.y = Math.max(12, Math.min(anchorY, panel.clientHeight - toolbarHeight - 8))
 }
 
 function stopFloatingDrag() {
@@ -542,6 +566,7 @@ function drawTable(Konva, objectGroup, table, cullingNodes) {
     table.y = Math.max(0, Math.round(group.y()))
     commit()
     renderScene()
+    positionToolbarNearSelection()
   })
 
   objectGroup.add(group)
@@ -616,6 +641,7 @@ function renderScene() {
 function onKonvaReady(api) {
   canvasApi.value = api
   renderScene()
+  positionToolbarNearSelection()
 }
 
 function onKeyDown(event) {
@@ -634,18 +660,18 @@ function onKeyDown(event) {
 
 onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
-  window.addEventListener('resize', resetFloatingToolbar)
-  resetFloatingToolbar()
+  window.addEventListener('resize', positionToolbarNearSelection)
+  positionToolbarNearSelection()
 })
 
 onBeforeUnmount(() => {
   stopFloatingDrag()
   window.removeEventListener('keydown', onKeyDown)
-  window.removeEventListener('resize', resetFloatingToolbar)
+  window.removeEventListener('resize', positionToolbarNearSelection)
 })
 
 watch([selectedTableId, selectedColumnKey], ([tId, cKey], [prevT, prevC]) => {
-  if ((tId && tId !== prevT) || (cKey && cKey !== prevC)) resetFloatingToolbar()
+  if ((tId && tId !== prevT) || (cKey && cKey !== prevC)) positionToolbarNearSelection()
 })
 </script>
 
@@ -674,6 +700,7 @@ watch([selectedTableId, selectedColumnKey], ([tId, cKey], [prevT, prevC]) => {
         class="konva-root"
         @ready="onKonvaReady"
         @logical-click="onLogicalClick"
+        @viewport-change="onViewportChange"
       />
 
       <div
