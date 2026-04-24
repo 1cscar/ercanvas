@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import KonvaHugeCanvas from '@/components/editor/konva/KonvaHugeCanvas.vue'
 
 const props = defineProps({
@@ -35,6 +35,7 @@ function normalizeNode(node) {
     fontColor: '#1f2937',
     fontWeight: '600',
     fontFamily: 'Noto Sans TC',
+    fontUnderline: false,
   }
   const next = { ...base, ...(node || {}) }
   if (!next.id) next.id = `n_${Math.random().toString(36).slice(2, 8)}`
@@ -78,6 +79,8 @@ const local = ref(normalizeContent(props.content))
 const canvasApi = ref(null)
 const canvasPanelRef = ref(null)
 const canvasToolbarRef = ref(null)
+const canvasStageRef = ref(null)
+const inlineEditorRef = ref(null)
 
 const selectedNodeId = ref('')
 const selectedEdgeId = ref('')
@@ -90,6 +93,8 @@ const floatingToolbar = ref({ x: Math.max(12, window.innerWidth - 200), y: 72 })
 let floatingDragState = null
 
 const viewport = ref({ scale: 1, x: 24, y: 24 })
+const editingNodeId = ref('')
+const editingLabelDraft = ref('')
 
 function onViewportChange(vp) {
   viewport.value = { scale: vp.scale, x: vp.position.x, y: vp.position.y }
@@ -110,6 +115,29 @@ function positionToolbarNearNode(node) {
 }
 
 const selectedNode = computed(() => local.value.nodes.find((n) => n.id === selectedNodeId.value) || null)
+const editingNode = computed(() => local.value.nodes.find((n) => n.id === editingNodeId.value) || null)
+const textToolbarDisabled = computed(() => !selectedNode.value)
+
+const inlineEditorStyle = computed(() => {
+  const node = editingNode.value
+  if (!node) return {}
+
+  const scale = viewport.value.scale || 1
+  const width = Math.max(120, Math.round(node.w * scale * 0.9))
+  const height = Math.max(34, Math.round(node.h * scale * 0.42))
+  const left = node.x * scale + viewport.value.x + Math.max(0, (node.w * scale - width) / 2)
+  const top = node.y * scale + viewport.value.y + Math.max(0, (node.h * scale - height) / 2)
+
+  return {
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${width}px`,
+    minHeight: `${height}px`,
+    fontSize: `${Math.max(12, Math.round((Number(node.fontSize) || 14) * scale))}px`,
+    fontWeight: node.fontWeight === '700' ? '700' : '400',
+    textDecoration: node.fontUnderline ? 'underline' : 'none',
+  }
+})
 
 const modeHint = computed(() => {
   if (toolMode.value === 'connect') {
@@ -217,6 +245,44 @@ function quickAddLinked(type) {
   renderScene()
 }
 
+function setSelectedFontSize(nextSize) {
+  if (!selectedNode.value) return
+  selectedNode.value.fontSize = clamp(Math.round(Number(nextSize) || 14), 10, 72)
+  commit()
+  renderScene()
+}
+
+function toggleSelectedUnderline() {
+  if (!selectedNode.value) return
+  selectedNode.value.fontUnderline = !selectedNode.value.fontUnderline
+  commit()
+  renderScene()
+}
+
+function openInlineEditor(nodeId) {
+  const node = local.value.nodes.find((item) => item.id === nodeId)
+  if (!node) return
+  selectedNodeId.value = nodeId
+  selectedEdgeId.value = ''
+  editingNodeId.value = nodeId
+  editingLabelDraft.value = node.label || ''
+  renderScene()
+}
+
+function commitInlineEditor() {
+  if (!editingNode.value) return
+  editingNode.value.label = editingLabelDraft.value.trim()
+  editingNodeId.value = ''
+  commit()
+  renderScene()
+}
+
+function cancelInlineEditor() {
+  editingNodeId.value = ''
+  editingLabelDraft.value = ''
+  renderScene()
+}
+
 function changeSelectedType(type) {
   if (!selectedNode.value) return
   selectedNode.value.type = type
@@ -320,6 +386,10 @@ function onNodeClick(nodeId) {
 }
 
 function onLogicalClick(pos) {
+  if (editingNodeId.value) {
+    commitInlineEditor()
+    return
+  }
   const placeType = queuedPlacementType.value || (toolMode.value === 'append' ? paletteType.value : '')
   if (placeType) {
     const node = createNode(placeType, pos.x, pos.y)
@@ -543,6 +613,7 @@ function buildNodeShape(Konva, node) {
     fontSize: Number(node.fontSize) || 14,
     fontStyle: node.fontWeight === '700' ? 'bold' : 'normal',
     fontFamily: node.fontFamily || 'Noto Sans TC',
+    textDecoration: node.fontUnderline ? 'underline' : '',
     align: 'center',
     verticalAlign: 'middle',
     listening: false,
@@ -551,6 +622,11 @@ function buildNodeShape(Konva, node) {
   group.on('click tap', (evt) => {
     evt.cancelBubble = true
     onNodeClick(node.id)
+  })
+
+  group.on('dblclick dbltap', (evt) => {
+    evt.cancelBubble = true
+    openInlineEditor(node.id)
   })
 
   group.on('dragstart', () => {
@@ -642,6 +718,10 @@ function onKeyDown(event) {
   const target = event.target
   if (target instanceof HTMLElement && target.closest('input, textarea, [contenteditable="true"], select')) return
   if (event.key === 'Escape') {
+    if (editingNodeId.value) {
+      cancelInlineEditor()
+      return
+    }
     cancelMode()
     return
   }
@@ -661,6 +741,13 @@ onBeforeUnmount(() => {
   stopFloatingDrag()
   window.removeEventListener('resize', resetFloatingToolbar)
   window.removeEventListener('keydown', onKeyDown)
+})
+
+watch(editingNodeId, async (next) => {
+  if (!next) return
+  await nextTick()
+  inlineEditorRef.value?.focus()
+  inlineEditorRef.value?.select()
 })
 
 watch(
@@ -689,49 +776,88 @@ watch(
     <main ref="canvasPanelRef" class="canvas-panel">
       <header ref="canvasToolbarRef" class="canvas-toolbar">
         <span class="mode-hint muted">{{ modeHint }}</span>
-      </header>
-      <KonvaHugeCanvas
-        class="konva-root"
-        @ready="onKonvaReady"
-        @logical-click="onLogicalClick"
-        @viewport-change="onViewportChange"
-      />
-
-      <div
-        v-if="selectedNode"
-        class="floating-toolbar"
-        :style="{ left: `${floatingToolbar.x}px`, top: `${floatingToolbar.y}px` }"
-      >
-        <div class="floating-toolbar-head" @mousedown="startFloatingDrag">
-          工具列（可拖動）
-        </div>
-        <div class="floating-toolbar-body">
+        <div class="text-toolbar" :class="{ disabled: textToolbarDisabled }">
+          <span class="text-toolbar-label">文字</span>
+          <button class="text-toolbar-btn" :disabled="textToolbarDisabled" @click="setSelectedFontSize((selectedNode?.fontSize || 14) - 2)">A-</button>
           <input
-            class="floating-input"
-            placeholder="元素名稱"
-            :value="selectedNode.label"
-            @input="updateSelectedField('label', $event.target.value)"
+            class="text-toolbar-input"
+            type="number"
+            min="10"
+            max="72"
+            :disabled="textToolbarDisabled"
+            :value="selectedNode?.fontSize || 14"
+            @change="setSelectedFontSize($event.target.value)"
           />
-          <select class="toolbar-select" @change="quickAddLinked($event.target.value); $event.target.value = ''">
-            <option value="">＋ 新增元素</option>
-            <option value="entity">實體</option>
-            <option value="attribute">屬性</option>
-            <option value="relationship">關係</option>
-            <option value="weak-entity">實體關聯</option>
-          </select>
-          <button class="floating-btn" @click="startConnectMode">→ 連線</button>
-          <button class="floating-btn" @click="cloneSelectedNode">⎘ 複製</button>
-          <button class="floating-btn danger" @click="removeSelected">刪除</button>
-          <select
-            class="toolbar-select"
-            :value="selectedNode.type"
-            @change="changeSelectedType($event.target.value)"
+          <button class="text-toolbar-btn" :disabled="textToolbarDisabled" @click="setSelectedFontSize((selectedNode?.fontSize || 14) + 2)">A+</button>
+          <button
+            class="text-toolbar-btn"
+            :class="{ active: selectedNode?.fontUnderline }"
+            :disabled="textToolbarDisabled"
+            @click="toggleSelectedUnderline"
           >
-            <option value="entity">更改：實體</option>
-            <option value="attribute">更改：屬性</option>
-            <option value="relationship">更改：關係</option>
-            <option value="weak-entity">更改：實體關聯</option>
-          </select>
+            底線
+          </button>
+        </div>
+      </header>
+      <div ref="canvasStageRef" class="canvas-stage">
+        <KonvaHugeCanvas
+          class="konva-root"
+          @ready="onKonvaReady"
+          @logical-click="onLogicalClick"
+          @viewport-change="onViewportChange"
+        />
+
+        <div
+          v-if="editingNode"
+          class="inline-text-editor"
+          :style="inlineEditorStyle"
+        >
+          <input
+            ref="inlineEditorRef"
+            v-model="editingLabelDraft"
+            class="inline-text-input"
+            @blur="commitInlineEditor"
+            @keydown.enter.prevent="commitInlineEditor"
+            @keydown.esc.prevent="cancelInlineEditor"
+          />
+        </div>
+
+        <div
+          v-if="selectedNode"
+          class="floating-toolbar"
+          :style="{ left: `${floatingToolbar.x}px`, top: `${floatingToolbar.y}px` }"
+        >
+          <div class="floating-toolbar-head" @mousedown="startFloatingDrag">
+            工具列（可拖動）
+          </div>
+          <div class="floating-toolbar-body">
+            <input
+              class="floating-input"
+              placeholder="元素名稱"
+              :value="selectedNode.label"
+              @input="updateSelectedField('label', $event.target.value)"
+            />
+            <select class="toolbar-select" @change="quickAddLinked($event.target.value); $event.target.value = ''">
+              <option value="">＋ 新增元素</option>
+              <option value="entity">實體</option>
+              <option value="attribute">屬性</option>
+              <option value="relationship">關係</option>
+              <option value="weak-entity">實體關聯</option>
+            </select>
+            <button class="floating-btn" @click="startConnectMode">→ 連線</button>
+            <button class="floating-btn" @click="cloneSelectedNode">⎘ 複製</button>
+            <button class="floating-btn danger" @click="removeSelected">刪除</button>
+            <select
+              class="toolbar-select"
+              :value="selectedNode.type"
+              @change="changeSelectedType($event.target.value)"
+            >
+              <option value="entity">更改：實體</option>
+              <option value="attribute">更改：屬性</option>
+              <option value="relationship">更改：關係</option>
+              <option value="weak-entity">更改：實體關聯</option>
+            </select>
+          </div>
         </div>
       </div>
     </main>
@@ -797,11 +923,62 @@ watch(
   padding: 6px 10px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.canvas-stage {
+  position: relative;
+  min-height: 0;
+  flex: 1;
 }
 
 .konva-root {
   flex: 1;
   min-height: 520px;
+}
+
+.text-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.text-toolbar.disabled {
+  opacity: 0.5;
+}
+
+.text-toolbar-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #7b8798;
+}
+
+.text-toolbar-btn,
+.text-toolbar-input {
+  border: 1px solid var(--mac-border);
+  border-radius: 7px;
+  background: #fff;
+  min-height: 28px;
+  font-size: 12px;
+}
+
+.text-toolbar-btn {
+  padding: 0 9px;
+  cursor: pointer;
+}
+
+.text-toolbar-btn.active {
+  border-color: rgba(10, 132, 255, 0.55);
+  background: rgba(10, 132, 255, 0.12);
+  color: #0a5ed8;
+}
+
+.text-toolbar-input {
+  width: 60px;
+  padding: 0 8px;
 }
 
 .muted {
@@ -866,6 +1043,24 @@ watch(
   border-radius: 7px;
   padding: 5px 8px;
   font-size: 12px;
+  box-sizing: border-box;
+}
+
+.inline-text-editor {
+  position: absolute;
+  z-index: 14;
+}
+
+.inline-text-input {
+  width: 100%;
+  min-height: inherit;
+  border: 1px solid rgba(10, 132, 255, 0.45);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.98);
+  color: #111827;
+  text-align: center;
+  padding: 6px 10px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
   box-sizing: border-box;
 }
 </style>
